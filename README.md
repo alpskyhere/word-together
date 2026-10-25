@@ -8,6 +8,8 @@ A picture-card word game for children and families. Explore **117 word groups**:
 
 [Play in English](https://alpskyhere.github.io/word-together/?lang=en) · [使用中文版](https://alpskyhere.github.io/word-together/?lang=zh)
 
+Keep GitHub open: ⌘-click (Mac) or Ctrl-click (Windows/Linux) either play link to open a new tab. On a phone, press and hold the link and choose a new tab.
+
 ## Language
 
 Choose **中文 / English** at the top of the page. Buttons, instructions, word notes, status messages and accessibility labels use the selected language. The learning words, pictures and pronunciation stay the same; words and speech are always English.
@@ -23,6 +25,8 @@ Language-specific links take priority, followed by your saved language choice, t
 Some combinations have a meaning of their own, such as `hot dog` and `butterfly`. Open **Word notes** for an explanation in the interface language. Notes start closed and close when you move to another group.
 
 Use **Choose words** to search in English or Chinese, **Shuffle** to rearrange the groups, and **Practice later** to save a group to your practice list. Colors show word parts, not syllables; this game is not a complete phonics course.
+
+**Celebrate** is off by default. Turn it on for silent confetti and a medal after every 10 different groups revealed in a batch, including practice. Repeated reveals within the batch do not count. The effect ends after 2.6 seconds and never blocks the controls or interrupts pronunciation. Reduced-motion settings show a still medal instead. The setting and unfinished batch stay in this browser; reloading does not replay a reward, and turning celebrations on again starts a new batch.
 
 ## Categories and sorting
 
@@ -53,4 +57,4 @@ python3 test_site.py
 node test_app.cjs
 ```
 
-Updated (California time): **10/25/2026 11:03 PDT (UTC-07:00)** · [Release information](release.json)
+Updated (California time): **10/25/2026 12:43 PDT (UTC-07:00)** · [Release information](release.json)

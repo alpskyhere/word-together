@@ -5,18 +5,19 @@ function memoryStorage(initial={}){
   const values=new Map(Object.entries(initial)),writes=[];
   return {values,writes,getItem(key){return values.get(key)??null},setItem(key,value){writes.push(key);values.set(key,value)}};
 }
-function boot({storage=memoryStorage(),data=payload,url='https://example.test/?lang=zh',languages=['zh-CN']}={}){
+function boot({storage=memoryStorage(),data=payload,url='https://example.test/?lang=zh',languages=['zh-CN'],reducedMotion=false}={}){
   const elements=new Map();
-  function el(id){if(!elements.has(id))elements.set(id,{id,style:{},dataset:{},attributes:{},textContent:'',innerHTML:'',value:'',hidden:id==='overlay',setAttribute(k,v){this.attributes[k]=String(v)},getAttribute(k){return this.attributes[k]??null},focus(){context.document.activeElement=this;},querySelectorAll(){return[]}});return elements.get(id)}
+  function el(id){if(!elements.has(id))elements.set(id,{id,style:{},dataset:{},attributes:{},textContent:'',innerHTML:'',value:'',hidden:['overlay','celebration'].includes(id),setAttribute(k,v){this.attributes[k]=String(v)},getAttribute(k){return this.attributes[k]??null},focus(){context.document.activeElement=this;},querySelectorAll(){return[]}});return elements.get(id)}
   el('word-data').textContent=data;
   el('updated-at').setAttribute('datetime',html.match(/<time id="updated-at" datetime="([^"]+)"/)[1]);
   const filters=filterKeys.map(k=>{let e=el('filter-'+k);e.dataset.filter=k;return e});
   const handlers={};
   const location=new URL(url),historyWrites=[];
   const history={replaceState(_state,_title,next){historyWrites.push(next);location.href=next;}};
-  const context=vm.createContext({document:{documentElement:el('document-root'),title:'',getElementById:el,querySelector:()=>el('progressbar'),querySelectorAll:()=>filters,addEventListener(type,fn){handlers[type]=fn}},window:{localStorage:storage,location,history,navigator:{languages,language:languages[0]},addEventListener(type,fn){handlers[type]=fn}},setTimeout:()=>0,clearTimeout(){},console,Math:Object.create(Math),URL,URLSearchParams});
+  let timerId=0;const timers=new Map();
+  const context=vm.createContext({document:{documentElement:el('document-root'),title:'',getElementById:el,querySelector:()=>el('progressbar'),querySelectorAll:()=>filters,addEventListener(type,fn){handlers[type]=fn}},window:{localStorage:storage,location,history,navigator:{languages,language:languages[0]},matchMedia:()=>({matches:reducedMotion}),addEventListener(type,fn){handlers[type]=fn}},setTimeout(fn,ms){const id=++timerId;timers.set(id,{fn,ms});return id},clearTimeout(id){timers.delete(id)},console,Math:Object.create(Math),URL,URLSearchParams});
   vm.runInContext(source,context);
-  return {context,el,handlers,filters,storage,location,historyWrites,run:s=>vm.runInContext(s,context)};
+  return {context,el,handlers,filters,storage,location,historyWrites,timers,run:s=>vm.runInContext(s,context)};
 }
 const ids=app=>JSON.parse(app.run('JSON.stringify(deck.map(c=>c.id))'));
 const filterKeys=[...html.matchAll(/data-filter="([^"]+)"/g)].map(m=>m[1]);
@@ -203,7 +204,7 @@ first.el('review-card').onclick();first.el('auto-read').onclick();
 let record=JSON.parse(savedStore.getItem(storageKey));
 assert.equal(record.currentId,resumeId);assert.equal(record.autoRead,false);
 assert.deepEqual(record.completed,[resumeId]);assert.deepEqual(record.review,[resumeId]);
-assert.deepEqual(Object.keys(record).sort(),['autoRead','completed','currentId','shuffleIds','filter','review','reviewOnly','sortOrder','version'].sort());
+assert.deepEqual(Object.keys(record).sort(),['autoRead','completed','currentId','shuffleIds','filter','review','reviewOnly','sortOrder','version','celebrationEnabled','celebrationBatch','lastCelebrationCard'].sort());
 assert.equal(savedStore.getItem('another-app'),'keep me');
 assert.ok(savedStore.writes.every(k=>k===storageKey));
 const writesBeforeReload=savedStore.writes.length;
@@ -544,3 +545,68 @@ let feedbackKeyPrevented=false;
 feedbackApp.handlers.keydown({key:' ',code:'Space',target:{matches:()=>true,tagName:'A'},preventDefault(){feedbackKeyPrevented=true}});
 assert.equal(feedbackKeyPrevented,false);
 console.log('Public feedback passed: repository, bilingual drafts, current word/version, empty deck, privacy, no render writes and native link keyboard behavior.');
+
+// Optional celebrations count reveals, not navigation, audio or repeated clicks.
+function revealIndex(app,index){app.run(`position=${index};revealed=false;render()`);app.el('reveal').onclick();}
+const party=boot();
+assert.equal(party.run('celebrationEnabled'),false);
+assert.equal(party.el('celebrate').textContent,'庆祝：关');
+assert.equal(party.el('celebrate').getAttribute('aria-pressed'),'false');
+assert.equal(party.storage.writes.length,0);
+for(let i=0;i<20;i++)revealIndex(party,i);
+assert.equal(party.el('celebration').hidden,true);
+assert.equal(party.run('celebrationBatch.size'),0);
+party.el('celebrate').onclick();
+assert.equal(party.el('celebrate').getAttribute('aria-pressed'),'true');
+for(let i=0;i<9;i++)revealIndex(party,i); // Previously seen groups still count as practice.
+assert.equal(party.el('celebration').hidden,true);
+for(let i=0;i<3;i++){party.run('showParts()');party.el('reveal').onclick();}
+assert.equal(party.run('celebrationBatch.size'),9);
+party.el('next').onclick();assert.equal(party.run('celebrationBatch.size'),9);
+party.el('reveal').focus();revealIndex(party,9);
+assert.equal(party.el('celebration').hidden,false);
+assert.equal(party.run('celebrationBatch.size'),0);
+assert.equal((party.el('confetti').innerHTML.match(/<i /g)||[]).length,24);
+assert.equal(party.context.document.activeElement,party.el('reveal'));
+assert.equal(party.el('celebration-text').textContent,'太棒了！完成 10 组！');
+party.run("setLanguage('en')");assert.equal(party.el('celebration-text').textContent,'Great work! 10 groups done!');
+assert.equal(party.el('celebrate').textContent,'Celebrate: on');
+const partyTimer=[...party.timers.values()].find(t=>t.ms===2600);assert.ok(partyTimer);partyTimer.fn();
+assert.equal(party.el('celebration').hidden,true);assert.equal(party.el('confetti').innerHTML,'');
+party.run('showParts()');party.el('reveal').onclick();assert.equal(party.run('celebrationBatch.size'),0);
+for(let i=10;i<20;i++)revealIndex(party,i);
+assert.equal(party.el('celebration').hidden,false); // The next ten trigger a new reward.
+party.el('celebrate').onclick();assert.equal(party.el('celebration').hidden,true);
+assert.equal(party.el('confetti').innerHTML,'');assert.equal(party.run('celebrationEnabled'),false);
+party.el('celebrate').onclick();assert.equal(party.run('celebrationBatch.size'),0);
+for(let i=0;i<4;i++)revealIndex(party,i);
+const resumedParty=boot({storage:party.storage});
+assert.equal(resumedParty.run('celebrationEnabled'),true);
+assert.equal(resumedParty.run('celebrationBatch.size'),4);
+assert.equal(resumedParty.el('celebration').hidden,true);
+for(let i=4;i<10;i++)revealIndex(resumedParty,i);
+assert.equal(resumedParty.el('celebration').hidden,false);
+const afterReward=boot({storage:party.storage});
+assert.equal(afterReward.el('celebration').hidden,true);assert.equal(afterReward.run('celebrationBatch.size'),0);
+revealIndex(afterReward,9);assert.equal(afterReward.run('celebrationBatch.size'),0);
+// Reduced motion uses the same milestone and cleanup, with no falling particles.
+const quietParty=boot({reducedMotion:true});quietParty.el('celebrate').onclick();
+for(let i=0;i<10;i++)revealIndex(quietParty,i);
+assert.equal(quietParty.el('celebration').hidden,false);assert.equal(quietParty.el('confetti').innerHTML,'');
+quietParty.run('openLibrary()');assert.equal(quietParty.el('celebration').hidden,true);
+// Cross-tab reads synchronize preferences without a reward or storage writes.
+const receiver=boot();const writes=receiver.storage.writes.length;
+receiver.handlers.storage({key:storageKey,newValue:party.storage.getItem(storageKey)});
+assert.equal(receiver.run('celebrationEnabled'),true);assert.equal(receiver.el('celebration').hidden,true);
+assert.equal(receiver.storage.writes.length,writes);
+receiver.handlers.storage({key:storageKey,newValue:null});assert.equal(receiver.run('celebrationEnabled'),false);
+const oldProgress=boot({storage:memoryStorage({[storageKey]:JSON.stringify({version:1,completed:[0,1]})})});
+assert.equal(oldProgress.run('completed.size'),2);assert.equal(oldProgress.run('celebrationEnabled'),false);
+for(const badBatch of [null,'bad',Array.from({length:11},(_,i)=>i)]){
+ const bad=boot({storage:memoryStorage({[storageKey]:JSON.stringify({version:1,celebrationEnabled:true,celebrationBatch:badBatch})})});
+ assert.equal(bad.run('celebrationBatch.size'),0);assert.equal(bad.el('celebration').hidden,true);
+}
+const sessionParty=boot({storage:{getItem(){throw Error('Blocked')},setItem(){throw Error('Blocked')}}});
+assert.doesNotThrow(()=>{sessionParty.el('celebrate').onclick();for(let i=0;i<10;i++)revealIndex(sessionParty,i)});
+assert.equal(sessionParty.el('celebration').hidden,false);
+console.log('Celebrations passed: default off, distinct groups, repeat prevention, each ten, timers, focus, bilingual copy, persistence, reduced motion, cross-tab reads, legacy/corrupt/blocked storage.');
