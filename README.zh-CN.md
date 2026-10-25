@@ -36,6 +36,12 @@
 
 也可以下载仓库，用浏览器打开 `index.html`，无需安装。词库、图片和两种界面语言内嵌在网页中；朗读是否可用取决于浏览器和系统语音。此版本不包含 PDF。
 
+## 提意见
+
+点击页面底部的 **提意见**，打开 [GitHub Issue](https://github.com/alpskyhere/word-together/issues/new)；也可以通过 **查看留言** 阅读和回复[已有意见](https://github.com/alpskyhere/word-together/issues)。发布需要 GitHub 账号和网络连接，所有留言公开。
+
+草稿会带上当前词组和网页版本，检查后再提交。不会附带学习记录或站点维护者的邮箱。请勿填写邮箱、孩子姓名或其他个人信息。
+
 ## 测试
 
 无需安装第三方包：
@@ -45,4 +51,4 @@ python3 test_site.py
 node test_app.cjs
 ```
 
-网页更新时间（加州时间）：**10/25/2026 09:07 PDT (UTC-07:00)** · [版本信息](release.json)
+网页更新时间（加州时间）：**10/25/2026 10:56 PDT (UTC-07:00)** · [版本信息](release.json)

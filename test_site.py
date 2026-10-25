@@ -1,5 +1,6 @@
 """Dependency-free checks for the published single-file learning game."""
 import hashlib
+from html.parser import HTMLParser
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -128,5 +129,28 @@ class SiteTests(unittest.TestCase):
         files={p.name for p in ROOT.iterdir() if p.name!='__pycache__'}
         self.assertEqual(files,expected)
         self.assertFalse(re.search(r'(?:href|src)\s*=\s*[\"\'][^\"\']*\.pdf(?:[?#\"\'])',self.html,re.I))
+
+    def test_public_feedback_links_and_documentation(self):
+        class Links(HTMLParser):
+            def __init__(self):
+                super().__init__();self.links={}
+            def handle_starttag(self,tag,attrs):
+                attrs=dict(attrs)
+                if tag=='a' and attrs.get('id','').startswith('feedback-'):
+                    self.links[attrs['id']]=attrs
+        parser=Links();parser.feed(self.html)
+        expected={'feedback-link':'/issues/new','feedback-browse':'/issues'}
+        self.assertEqual(set(parser.links),set(expected))
+        for key,suffix in expected.items():
+            link=parser.links[key]
+            self.assertEqual(link['href'],'https://github.com/alpskyhere/word-together'+suffix)
+            self.assertEqual(link['target'],'_blank')
+            self.assertEqual(set(link['rel'].split()),{'noopener','noreferrer'})
+            self.assertEqual(link['referrerpolicy'],'no-referrer')
+            self.assertEqual(link['aria-describedby'],'feedback-notice')
+        self.assertNotIn('mailto:',self.html)
+        for filename,terms in [('README.md',('GitHub account','all posts are public','current word group','website version')),('README.zh-CN.md',('GitHub 账号','所有留言公开','当前词组','网页版本'))]:
+            doc=(ROOT/filename).read_text()
+            for text in terms:self.assertIn(text,doc)
 
 if __name__=='__main__':unittest.main()

@@ -36,6 +36,12 @@ Progress and your explicit language choice stay in the current browser and are n
 
 You can also download the repository and open `index.html` in a browser, without installing anything. Words, pictures and both interface languages are embedded; speech availability depends on the browser and system voices. This release does not include PDFs.
 
+## Feedback
+
+Choose **Feedback** at the bottom of the page to open a [GitHub Issue](https://github.com/alpskyhere/word-together/issues/new), or **View feedback** to read and comment on [existing posts](https://github.com/alpskyhere/word-together/issues). Posting requires a GitHub account and an internet connection; all posts are public.
+
+The draft includes the current word group and website version. Review it before submitting. Learning records and the site owner's email are not included. Please leave out email addresses, children's names and other personal information.
+
 ## Tests
 
 No third-party packages are required:
@@ -45,4 +51,4 @@ python3 test_site.py
 node test_app.cjs
 ```
 
-Updated (California time): **10/25/2026 09:07 PDT (UTC-07:00)** · [Release information](release.json)
+Updated (California time): **10/25/2026 10:56 PDT (UTC-07:00)** · [Release information](release.json)

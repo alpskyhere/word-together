@@ -7,8 +7,9 @@ function memoryStorage(initial={}){
 }
 function boot({storage=memoryStorage(),data=payload,url='https://example.test/?lang=zh',languages=['zh-CN']}={}){
   const elements=new Map();
-  function el(id){if(!elements.has(id))elements.set(id,{id,style:{},dataset:{},attributes:{},textContent:'',innerHTML:'',value:'',hidden:id==='overlay',setAttribute(k,v){this.attributes[k]=String(v)},focus(){context.document.activeElement=this;},querySelectorAll(){return[]}});return elements.get(id)}
+  function el(id){if(!elements.has(id))elements.set(id,{id,style:{},dataset:{},attributes:{},textContent:'',innerHTML:'',value:'',hidden:id==='overlay',setAttribute(k,v){this.attributes[k]=String(v)},getAttribute(k){return this.attributes[k]??null},focus(){context.document.activeElement=this;},querySelectorAll(){return[]}});return elements.get(id)}
   el('word-data').textContent=data;
+  el('updated-at').setAttribute('datetime',html.match(/<time id="updated-at" datetime="([^"]+)"/)[1]);
   const filters=filterKeys.map(k=>{let e=el('filter-'+k);e.dataset.filter=k;return e});
   const handlers={};
   const location=new URL(url),historyWrites=[];
@@ -451,3 +452,40 @@ confirmCurrent.run("setLanguage('en')");
 assert.equal(confirmCurrent.storage.getItem(languageKey),'en');
 assert.equal(confirmCurrent.storage.getItem(storageKey),null);
 assert.equal(confirmCurrent.location.search,'?lang=en');
+
+// Feedback creates a public draft on the intended repository. It never sends
+// learning records, the current page URL, private search input or an email.
+const feedbackApp=boot({url:'https://example.test/private-location?lang=zh&private=do-not-share'});
+const feedbackURL=()=>new URL(feedbackApp.el('feedback-link').getAttribute('href'));
+let feedback=feedbackURL();
+assert.equal(feedback.origin,'https://github.com');
+assert.equal(feedback.pathname,'/alpskyhere/word-together/issues/new');
+assert.deepEqual([...feedback.searchParams.keys()],['title','body']);
+assert.equal(feedback.searchParams.get('title'),'反馈：snowman');
+assert.match(feedback.searchParams.get('body'),/当前词组: snow \+ man → snowman/);
+assert.ok(feedback.searchParams.get('body').includes(feedbackApp.el('updated-at').getAttribute('datetime')));
+assert.equal(feedbackApp.storage.writes.length,0);
+assert.equal(feedbackApp.el('feedback-notice').textContent,'GitHub · 需登录 · 留言公开');
+feedbackApp.run("move(1);setLanguage('en')");feedback=feedbackURL();
+assert.equal(feedback.searchParams.get('title'),'Feedback: snowball');
+assert.match(feedback.searchParams.get('body'),/Word group: snow \+ ball → snowball/);
+assert.match(feedback.searchParams.get('body'),/This post is public/);
+assert.doesNotMatch(feedback.searchParams.get('body'),/[\u4e00-\u9fff]/);
+assert.equal(feedbackApp.el('feedback-link').textContent,'Feedback ↗');
+assert.equal(feedbackApp.el('feedback-browse').textContent,'View feedback ↗');
+assert.equal(feedbackApp.el('feedback-notice').textContent,'GitHub · Sign-in required · Public posts');
+feedbackApp.run('openLibrary()');feedbackApp.el('search').value='private-search-content';
+const feedbackWrites=feedbackApp.storage.writes.length;
+feedbackApp.run('render()');
+assert.equal(feedbackApp.storage.writes.length,feedbackWrites);
+assert.doesNotMatch(decodeURIComponent(feedbackURL().href),/example\.test|private-location|do-not-share|private-search-content|completed|reviewOnly|currentId/);
+feedbackApp.run('closeLibrary();toggleReviewOnly()');feedback=feedbackURL();
+assert.equal(feedback.searchParams.get('title'),'Website feedback');
+assert.doesNotMatch(feedback.searchParams.get('body'),/Word group:|undefined|null/);
+feedbackApp.run("setLanguage('zh')");
+assert.equal(feedbackURL().searchParams.get('title'),'网站反馈');
+// Native links keep their keyboard behavior instead of revealing a card.
+let feedbackKeyPrevented=false;
+feedbackApp.handlers.keydown({key:' ',code:'Space',target:{matches:()=>true,tagName:'A'},preventDefault(){feedbackKeyPrevented=true}});
+assert.equal(feedbackKeyPrevented,false);
+console.log('Public feedback passed: repository, bilingual drafts, current word/version, empty deck, privacy, no render writes and native link keyboard behavior.');
