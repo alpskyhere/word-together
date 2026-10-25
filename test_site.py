@@ -53,6 +53,21 @@ class SiteTests(unittest.TestCase):
                 self.assertTrue(root.tag.endswith('svg'))
         self.assertEqual(ET.fromstring(self.data['art']['pot@flower']).get('aria-label'),'pot')
 
+    def test_chinese_help_is_complete_and_documented(self):
+        for card in self.data['cards']:
+            for key in ('a','b','word'):
+                with self.subTest(word=card['word'],part=key):
+                    self.assertRegex(card['zh'][key],r'[\u4e00-\u9fff]')
+        self.assertIn('<summary>中文提示</summary>',self.html)
+        self.assertIn('搜索中文或英文词组',self.html)
+        meanings={card['word']:card['zh'] for card in self.data['cards']}
+        self.assertEqual(meanings['hot dog']['word'],'热狗')
+        self.assertIn('不是',meanings['hot dog']['note'])
+        readme=(ROOT/'README.md').read_text()
+        for text in ('中文提示','中文或英文','snowman（雪人）','butterfly','默认收起'):
+            self.assertIn(text,readme)
+        self.assertNotIn('GitHub Pages 启用后可用',readme)
+
     def test_images_differ_by_more_than_color(self):
         def shape(word):
             root=ET.fromstring(self.data['art'][word])

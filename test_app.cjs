@@ -336,18 +336,61 @@ localSort.handlers.storage({key:storageKey,newValue:JSON.stringify({version:1,so
 assert.equal(localSort.run('sortOrder'),'az');assert.equal(localSort.run('deck[position].id'),localSortId);
 console.log('Sorting passed: A–Z, Z–A, length, reset, search, filters, review, persistence, old records and cross-tab stability.');
 
-// Material guidance stays local to rubber duck and never changes game progress.
-const material=boot(),materialWrites=material.storage.writes.length;
-assert.match(html,/<details id="word-help" class="word-help" hidden>/);
-assert.match(html,/rubber 在这里指橡胶，是一种材料/);
-assert.equal(material.el('word-help').hidden,true);
-material.run("position=deck.findIndex(c=>c.word==='rubber duck');render()");
-assert.equal(material.el('word-help').hidden,false);assert.equal(material.el('word-help').open,false);
-material.el('word-help').open=true;
-material.handlers.keydown({key:' ',code:'Space',target:{tagName:'SUMMARY',matches:s=>s.split(',').includes('summary')},preventDefault(){throw Error('Native help expansion intercepted')}});
-assert.equal(material.run('revealed'),false);assert.equal(material.storage.writes.length,materialWrites);
-material.el('reveal').onclick();assert.equal(material.el('word-help').open,true);assert.equal(material.run('revealed'),true);
-material.el('reveal').onclick();assert.equal(material.el('word-help').hidden,true);assert.equal(material.el('word-help').open,false);
-material.run("position=deck.findIndex(c=>c.word==='rubber duck');render()");assert.equal(material.el('word-help').open,false);
-material.run('toggleReviewOnly()');assert.equal(material.run('deck.length'),0);assert.equal(material.el('word-help').hidden,true);
-console.log('Material hint passed: rubber-only visibility, collapsed default, keyboard expansion, no storage side effects and empty review.');
+// Chinese hints explain the whole deck without changing learning progress.
+const chinese=boot(),hintWrites=chinese.storage.writes.length;
+assert.match(html,/<details id="word-help" class="word-help" hidden><summary>中文提示<\/summary>/);
+assert.equal(chinese.el('word-help').hidden,false);
+assert.equal(chinese.el('word-help').open,false);
+assert.match(chinese.el('word-help-content').innerHTML,/雪人/);
+assert.doesNotMatch(chinese.el('cards').innerHTML,/雪人|组合后/);
+chinese.el('word-help').open=true;
+chinese.handlers.keydown({key:' ',code:'Space',target:{tagName:'SUMMARY',matches:s=>s.split(',').includes('summary')},preventDefault(){throw Error('Native help expansion intercepted')}});
+assert.equal(chinese.run('revealed'),false);assert.equal(chinese.storage.writes.length,hintWrites);
+chinese.el('reveal').onclick();assert.equal(chinese.el('word-help').open,true);
+chinese.el('split').onclick();assert.equal(chinese.el('word-help').open,true);
+chinese.run('move(1)');assert.equal(chinese.el('word-help').open,false);
+assert.doesNotMatch(chinese.el('word-help-content').innerHTML,/雪人/);
+chinese.run('move(-1)');assert.equal(chinese.el('word-help').open,false);
+for(const card of JSON.parse(payload).cards){
+  chinese.run(`position=deck.findIndex(c=>c.id===${card.id});render()`);
+  const content=chinese.el('word-help-content').innerHTML;
+  for(const key of ['a','b','word'])assert.ok(content.includes(card.zh[key]),`${card.word} missing ${key} meaning`);
+  if(card.zh.note)assert.ok(content.includes(card.zh.note));
+  assert.equal(chinese.el('word-help').hidden,false);
+  assert.equal(chinese.el('word-help').open,false);
+}
+chinese.run("position=deck.findIndex(c=>c.word==='rubber duck');render()");
+assert.match(chinese.el('word-help-content').innerHTML,/rubber 在这里指橡胶/);
+chinese.run("position=deck.findIndex(c=>c.word==='snowman');render()");
+assert.doesNotMatch(chinese.el('word-help-content').innerHTML,/橡胶/);
+chinese.run('toggleReviewOnly()');
+assert.equal(chinese.run('deck.length'),0);assert.equal(chinese.el('word-help').hidden,true);
+assert.equal(chinese.el('word-help').open,false);assert.equal(chinese.el('word-help-content').innerHTML,'');
+// Search recognizes Chinese meanings, English spelling, and context-specific senses.
+const searching=boot();searching.run('openLibrary()');
+for(const [query,word] of [['雪人','snowman'],['热狗','hot dog'],['橡胶','rubber duck'],['盆','flower pot'],[' SNOWMAN ','snowman']]){
+  searching.el('search').value=query;searching.el('search').oninput();
+  const matches=[...searching.el('library').innerHTML.matchAll(/data-id="(\d+)"/g)].map(m=>Number(m[1]));
+  const expectedId=baseCards.find(c=>c.word===word).id;
+  assert.ok(matches.includes(expectedId),`${query} did not find ${word}`);
+}
+searching.el('search').value='雪人';searching.el('search').oninput();
+assert.match(searching.el('library').innerHTML,/<small class="entry-meaning">雪人<\/small>/);
+assert.equal((searching.el('library').innerHTML.match(/class="entry /g)||[]).length,1);
+const beforeChineseSelection=searching.storage.writes.length;
+searching.el('library').onclick({target:{closest:()=>({dataset:{id:'4'}})}});
+assert.equal(searching.run('deck[position].word'),'snowman');
+assert.equal(searching.el('word-help').open,false);
+assert.equal(searching.storage.writes.length,beforeChineseSelection+1);
+const searchWrites=searching.storage.writes.length;
+searching.run('openLibrary()');searching.el('search').value='找不到的词';searching.el('search').oninput();
+assert.match(searching.el('library').innerHTML,/没有找到/);
+assert.equal(searching.storage.writes.length,searchWrites);
+// Escape all help and search-result text, even if future vocabulary contains markup.
+const injected=JSON.parse(payload);injected.cards[0].zh={a:'<img src=x onerror=alert(1)>',b:'a&b',word:'<script>alert(1)</script>',note:'<b>unsafe</b>'};
+const safeHints=boot({data:JSON.stringify(injected)});
+assert.doesNotMatch(safeHints.el('word-help-content').innerHTML,/<img|<script|<b>/);
+assert.match(safeHints.el('word-help-content').innerHTML,/&lt;img/);
+safeHints.run('openLibrary()');
+assert.doesNotMatch(safeHints.el('library').innerHTML,/<script>/);
+console.log('Chinese support passed: all 117 meanings, contextual notes, collapsed defaults, reveal/split, card changes, keyboard, empty review, bilingual search, selection, no hint/search storage writes, and escaped text.');
