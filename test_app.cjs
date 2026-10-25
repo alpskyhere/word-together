@@ -14,10 +14,11 @@ function boot({storage=memoryStorage(),data=payload,url='https://example.test/?l
   const handlers={};
   const location=new URL(url),historyWrites=[];
   const history={replaceState(_state,_title,next){historyWrites.push(next);location.href=next;}};
-  const context=vm.createContext({document:{documentElement:el('document-root'),title:'',getElementById:el,querySelector:()=>el('progressbar'),querySelectorAll:()=>filters,addEventListener(type,fn){handlers[type]=fn}},window:{localStorage:storage,location,history,navigator:{languages,language:languages[0]},addEventListener(type,fn){handlers[type]=fn}},setTimeout:()=>0,clearTimeout(){},console,Math,URL,URLSearchParams});
+  const context=vm.createContext({document:{documentElement:el('document-root'),title:'',getElementById:el,querySelector:()=>el('progressbar'),querySelectorAll:()=>filters,addEventListener(type,fn){handlers[type]=fn}},window:{localStorage:storage,location,history,navigator:{languages,language:languages[0]},addEventListener(type,fn){handlers[type]=fn}},setTimeout:()=>0,clearTimeout(){},console,Math:Object.create(Math),URL,URLSearchParams});
   vm.runInContext(source,context);
   return {context,el,handlers,filters,storage,location,historyWrites,run:s=>vm.runInContext(s,context)};
 }
+const ids=app=>JSON.parse(app.run('JSON.stringify(deck.map(c=>c.id))'));
 const filterKeys=[...html.matchAll(/data-filter="([^"]+)"/g)].map(m=>m[1]);
 assert.deepEqual(filterKeys,['all','compound','pair']);
 const {context,el,handlers,filters,run}=boot();
@@ -123,9 +124,13 @@ assert.equal(el('overlay').hidden,true);assert.equal(context.document.activeElem
 let prevented=false;
 handlers.keydown({...space,repeat:true,preventDefault(){prevented=true}});
 assert.equal(prevented,true); // Holding Space must not start scrolling the page.
+const reshuffling=boot();
 for(let i=0;i<40;i++){
-  const old=run('position');el('random').onclick();
-  assert.notEqual(run('position'),old);assert.equal(run('revealed'),false);
+  const old=ids(reshuffling);reshuffling.el('random').onclick();
+  assert.notDeepEqual(ids(reshuffling),old);
+  assert.deepEqual(ids(reshuffling).slice().sort((a,b)=>a-b),Array.from({length:117},(_,n)=>n));
+  assert.equal(reshuffling.run('position'),0);assert.equal(reshuffling.run('revealed'),false);
+  assert.equal(reshuffling.el('sort-order').value,'shuffle');
 }
 // Normal cancellation, late callbacks and real failures need different handling.
 let utterance;const spoken=[];
@@ -198,7 +203,7 @@ first.el('review-card').onclick();first.el('auto-read').onclick();
 let record=JSON.parse(savedStore.getItem(storageKey));
 assert.equal(record.currentId,resumeId);assert.equal(record.autoRead,false);
 assert.deepEqual(record.completed,[resumeId]);assert.deepEqual(record.review,[resumeId]);
-assert.deepEqual(Object.keys(record).sort(),['autoRead','completed','currentId','drawn','filter','review','reviewOnly','sortOrder','version'].sort());
+assert.deepEqual(Object.keys(record).sort(),['autoRead','completed','currentId','shuffleIds','filter','review','reviewOnly','sortOrder','version'].sort());
 assert.equal(savedStore.getItem('another-app'),'keep me');
 assert.ok(savedStore.writes.every(k=>k===storageKey));
 const writesBeforeReload=savedStore.writes.length;
@@ -230,7 +235,7 @@ assert.equal(reviewReload.run('deck.length'),0);assert.match(reviewReload.el('ca
 assert.equal(reviewReload.el('reveal').disabled,true);assert.equal(reviewReload.el('review-card').hidden,true);
 assert.equal(reviewReload.el('prev').disabled,true);assert.equal(reviewReload.el('next').disabled,true);
 assert.equal(reviewReload.el('progressbar').attributes['aria-valuenow'],'0');
-assert.doesNotThrow(()=>reviewReload.run('primaryAction();move(1);move(-1);randomCard()'));
+assert.doesNotThrow(()=>reviewReload.run('primaryAction();move(1);move(-1);shuffleDeck()'));
 reviewReload.run("setFilter('compound')");assert.equal(reviewReload.run('deck[0].id'),resumeId);
 reviewReload.el('review-card').onclick();assert.equal(reviewReload.run('review.size'),0);
 reviewReload.run('openLibrary()');assert.match(reviewReload.el('library').innerHTML,/snowman/);
@@ -240,21 +245,72 @@ assert.equal(reviewReload.run('deck[position].id'),pairId);
 reviewReload.el('review-only').onclick();assert.equal(reviewReload.run('deck.length'),0);
 reviewReload.el('review-only').onclick();assert.equal(reviewReload.run('deck.length'),117);
 
-// Draw every card once before repeating, and preserve the cycle after reload.
+// One shuffle changes the complete order; Next group then visits every card
+// exactly once, including across reloads, without reshuffling on render.
 const shuffleStore=memoryStorage();let shuffle=boot({storage:shuffleStore});
-const seen=new Set([shuffle.run('deck[position].id')]);
-for(let i=0;i<116;i++){
+shuffle.el('random').onclick();const shuffledSequence=ids(shuffle);
+const visited=[];
+for(let i=0;i<117;i++){
   if(i===41)shuffle=boot({storage:shuffleStore});
-  shuffle.el('random').onclick();const id=shuffle.run('deck[position].id');
-  assert.equal(seen.has(id),false);seen.add(id);
+  assert.deepEqual(ids(shuffle),shuffledSequence);
+  visited.push(shuffle.run('deck[position].id'));
+  shuffle.el('reveal').onclick(); // Reveal, then follow the primary next button.
+  assert.equal(shuffle.run('revealed'),true);
+  shuffle.el('reveal').onclick();
 }
-assert.equal(seen.size,117);assert.equal(shuffle.run('completed.size'),0);
-let previous=shuffle.run('deck[position].id');shuffle.el('random').onclick();
-assert.notEqual(shuffle.run('deck[position].id'),previous);
-shuffle=boot();shuffle.run("setFilter('pair')");
-const pairCycle=new Set([shuffle.run('deck[position].id')]);
-for(let i=0;i<37;i++){shuffle.el('random').onclick();const id=shuffle.run('deck[position].id');assert.equal(pairCycle.has(id),false);pairCycle.add(id);}
-assert.equal(pairCycle.size,38);assert.equal(shuffle.run("deck.every(c=>c.kind==='pair')"),true);
+assert.deepEqual(visited,shuffledSequence);assert.equal(new Set(visited).size,117);
+assert.equal(shuffle.run('completed.size'),117);assert.equal(shuffle.run('position'),0);
+const stableWrites=shuffleStore.writes.length;
+shuffle.run('render();renderLibrary()');assert.deepEqual(ids(shuffle),shuffledSequence);
+assert.equal(shuffleStore.writes.length,stableWrites);
+shuffle.run("setLanguage('en')");assert.deepEqual(ids(shuffle),shuffledSequence);
+shuffle.el('random').onclick();assert.notDeepEqual(ids(shuffle),shuffledSequence);
+assert.equal(shuffle.run('completed.size'),117);assert.equal(shuffle.run('revealed'),false);
+// Category and search views keep the relative order of the same permutation.
+const allShuffled=ids(shuffle);
+shuffle.run("setFilter('pair')");const pairSequence=ids(shuffle);
+assert.deepEqual(pairSequence,allShuffled.filter(id=>shuffle.run(`ALL.find(c=>c.id===${id}).kind==='pair'`)));
+assert.equal(pairSequence.length,38);
+shuffle.el('random').onclick();assert.notDeepEqual(ids(shuffle),pairSequence);
+assert.equal(new Set(ids(shuffle)).size,38);assert.equal(shuffle.run("deck.every(c=>c.kind==='pair')"),true);
+shuffle.run("setFilter('all');openLibrary()");
+assert.deepEqual([...shuffle.el('library').innerHTML.matchAll(/data-id="(\d+)"/g)].map(m=>Number(m[1])),ids(shuffle));
+shuffle.el('search').value='snow';shuffle.el('search').oninput();
+const snowIds=[...shuffle.el('library').innerHTML.matchAll(/data-id="(\d+)"/g)].map(m=>Number(m[1]));
+assert.deepEqual(snowIds,ids(shuffle).filter(id=>shuffle.run(`ALL.find(c=>c.id===${id}).word.includes('snow')`)));
+shuffle.run('closeLibrary();move(5)');const shuffleCurrent=shuffle.run('deck[position].id'),sequenceBeforeSync=ids(shuffle);
+const syncWrites=shuffleStore.writes.length;
+shuffle.handlers.storage({key:storageKey,newValue:JSON.stringify({version:1,sortOrder:'shuffle',shuffleIds:allShuffled,completed:[shuffleCurrent],review:[]})});
+assert.deepEqual(ids(shuffle),sequenceBeforeSync);assert.equal(shuffle.run('deck[position].id'),shuffleCurrent);
+assert.equal(shuffleStore.writes.length,syncWrites);
+// A repeated RNG result still produces a different order, including just two
+// review cards. Neither shuffling nor selecting another sort clears progress.
+const twoCards=boot();twoCards.run('toggleReview();move(1);primaryAction();toggleReview();toggleReviewOnly();Math.random=()=>.999999');
+for(let i=0;i<4;i++){
+  const old=ids(twoCards);twoCards.el('random').onclick();assert.deepEqual(ids(twoCards),old.slice().reverse());
+  assert.equal(twoCards.run('completed.size'),1);assert.equal(twoCards.run('review.size'),2);
+}
+assert.equal(twoCards.el('toast').textContent,'已重新打乱 2 组');
+twoCards.run("setSort('recommended');Math.random=()=>.999999");
+const unchangedCandidate=ids(twoCards);twoCards.el('sort-order').onchange({target:{value:'shuffle'}});
+assert.notDeepEqual(ids(twoCards),unchangedCandidate);assert.equal(twoCards.el('sort-order').value,'shuffle');
+// Single-card and empty views cannot change order and don't write new state.
+twoCards.run('toggleReview()');assert.equal(twoCards.run('deck.length'),1);
+assert.equal(twoCards.el('random').disabled,true);assert.equal(twoCards.el('sort-shuffle').disabled,true);
+let smallWrites=twoCards.storage.writes.length;twoCards.run('shuffleDeck()');assert.equal(twoCards.storage.writes.length,smallWrites);
+twoCards.run("setSort('az')");smallWrites=twoCards.storage.writes.length;
+twoCards.el('sort-order').value='shuffle';twoCards.run("setSort('shuffle')");
+assert.equal(twoCards.el('sort-order').value,'az');assert.equal(twoCards.storage.writes.length,smallWrites);
+twoCards.run('toggleReview()');smallWrites=twoCards.storage.writes.length;twoCards.run('shuffleDeck()');
+assert.equal(twoCards.run('deck.length'),0);assert.equal(twoCards.storage.writes.length,smallWrites);
+// Missing, duplicate, unknown, string or incomplete order IDs safely fall back.
+for(const badOrder of [null,[],[0,1],Array(117).fill(0),Array.from({length:117},(_,i)=>String(i)),Array.from({length:117},(_,i)=>i+1)]){
+  const corruptShuffle=memoryStorage({[storageKey]:JSON.stringify({version:1,sortOrder:'shuffle',shuffleIds:badOrder,currentId:resumeId,completed:[resumeId],review:[resumeId]})});
+  const safe=boot({storage:corruptShuffle});assert.equal(safe.run('sortOrder'),'recommended');
+  assert.equal(safe.run('deck[position].id'),resumeId);assert.equal(safe.run('completed.size'),1);assert.equal(safe.run('review.size'),1);
+  assert.equal(corruptShuffle.writes.length,0);
+}
+console.log('Shuffle order passed: 117 unique groups, changed permutations, next/restart, reload, filters/search/review, two-card fallback, single/empty lists, corrupt records and cross-tab stability.');
 
 // Malformed, old or unavailable storage must not break playing or overwrite
 // an unsupported future schema. Only known numeric IDs can be restored.
@@ -271,7 +327,7 @@ const future=boot({storage:futureStore});future.run('move(1);primaryAction()');
 assert.equal(futureStore.writes.length,0);assert.match(future.el('learning-status').textContent,/仅本次有效/);
 for(const storage of [null,{getItem(){throw new Error('Blocked')}},{getItem(){return null},setItem(){throw new Error('Quota')}}]){
   const unavailable=boot({storage});
-  assert.doesNotThrow(()=>unavailable.run('move(1);primaryAction();toggleReview();toggleAutoRead();randomCard()'));
+  assert.doesNotThrow(()=>unavailable.run('move(1);primaryAction();toggleReview();toggleAutoRead();shuffleDeck()'));
   assert.equal(unavailable.run('completed.size'),1);assert.equal(unavailable.run('review.size'),1);
   assert.match(unavailable.el('learning-status').textContent,/仅本次有效/);
 }
@@ -291,19 +347,18 @@ right.handlers.storage({key:storageKey,newValue:shared.getItem(storageKey)});
 assert.equal(right.run('deck.length'),0);assert.equal(right.el('reveal').disabled,true);
 right.handlers.storage({key:'another-app',newValue:'garbage'});assert.equal(right.run('storageState'),'ready');
 right.handlers.storage({key:storageKey,newValue:null});assert.equal(right.run('completed.size'),0);
-console.log('Persistence passed: reload, stable IDs, unique revealed counts, review/empty states, nonrepeating cycles, malformed data, storage failures and cross-tab events.');
+console.log('Persistence passed: reload, stable IDs, unique revealed counts, review/empty states, saved shuffle order, malformed data, storage failures and cross-tab events.');
 
 // Sort controls, exact alphabetic/length ordering and filter/review composition.
 assert.match(html,/<button data-filter="compound" aria-pressed="false"><span id="category-compound">连着写<\/span> <span id="compound-count"><\/span><\/button>/);
 assert.match(html,/<button data-filter="pair" aria-pressed="false"><span id="category-pair">分开写<\/span> <span id="pair-count"><\/span><\/button>/);
 assert.doesNotMatch(html,/合成一个词|保留两个词/);
-assert.deepEqual([...html.matchAll(/<option id="[^"]+" value="([^"]+)">/g)].map(m=>m[1]),['recommended','az','za','short']);
+assert.deepEqual([...html.matchAll(/<option id="[^"]+" value="([^"]+)">/g)].map(m=>m[1]),['recommended','az','za','short','shuffle']);
 const sortedStore=memoryStorage(),sorting=boot({storage:sortedStore});
 const baseCards=JSON.parse(payload).cards;
 const spellingOf=c=>c.word.replace(/\s/g,'');
 const expectedAz=baseCards.slice().sort((a,b)=>spellingOf(a).localeCompare(spellingOf(b),'en')||a.id-b.id);
 const expectedShort=baseCards.slice().sort((a,b)=>spellingOf(a).length-spellingOf(b).length||spellingOf(a).localeCompare(spellingOf(b),'en')||a.id-b.id);
-const ids=app=>JSON.parse(app.run('JSON.stringify(deck.map(c=>c.id))'));
 sorting.el('reveal').onclick();const completionBefore=sorting.run('completed.size');
 sorting.el('sort-order').onchange({target:{value:'az'}});
 assert.deepEqual(ids(sorting),expectedAz.map(c=>c.id));assert.equal(sorting.run('position'),0);assert.equal(sorting.run('revealed'),false);
@@ -324,7 +379,7 @@ sortingReload.run('closeLibrary();toggleReview();move(1);toggleReview();toggleRe
 assert.equal(sortingReload.run('deck.length'),2);
 sortingReload.run("setSort('za')");assert.deepEqual(ids(sortingReload),expectedAz.filter(c=>sortingReload.run(`review.has(${c.id})`)).map(c=>c.id).reverse());
 sortingReload.run('toggleReview();toggleReview()');assert.equal(sortingReload.run('deck.length'),0);
-assert.doesNotThrow(()=>sortingReload.run("setSort('short');primaryAction();randomCard()"));
+assert.doesNotThrow(()=>sortingReload.run("setSort('short');primaryAction();shuffleDeck()"));
 assert.equal(sortingReload.el('reveal').disabled,true);
 const invalidSort=boot({storage:memoryStorage({[storageKey]:JSON.stringify({version:1,sortOrder:'bad'})})});
 assert.equal(invalidSort.run('sortOrder'),'recommended');assert.equal(first.run('sortOrder'),'recommended');
@@ -398,16 +453,16 @@ for(const [url,saved,languages,expected] of [
 const languageStore=memoryStorage(),langApp=boot({storage:languageStore,url:'https://example.test/'});
 langApp.run("setSort('az');position=deck.findIndex(c=>c.word==='rubber duck');render();primaryAction();toggleReview()");
 langApp.el('word-help').open=true;
-const stateBefore=langApp.run('JSON.stringify({position,sortOrder,filter,revealed,autoRead,review:[...review],completed:[...completed],drawn:[...drawn]})');
+const stateBefore=langApp.run('JSON.stringify({position,sortOrder,filter,revealed,autoRead,review:[...review],completed:[...completed],shuffleIds})');
 const progressBefore=languageStore.getItem(storageKey),writesBeforeLanguage=languageStore.writes.length;
 langApp.el('language-en').onclick({preventDefault(){}});
 assert.equal(langApp.run('locale'),'en');assert.equal(languageStore.getItem(languageKey),'en');
 assert.equal(languageStore.getItem(storageKey),progressBefore);
 assert.deepEqual(languageStore.writes.slice(writesBeforeLanguage),[languageKey]);
-assert.equal(langApp.run('JSON.stringify({position,sortOrder,filter,revealed,autoRead,review:[...review],completed:[...completed],drawn:[...drawn]})'),stateBefore);
+assert.equal(langApp.run('JSON.stringify({position,sortOrder,filter,revealed,autoRead,review:[...review],completed:[...completed],shuffleIds})'),stateBefore);
 assert.equal(langApp.el('word-help').open,true);assert.match(langApp.el('word-help-content').innerHTML,/Rubber is a material/);
 assert.doesNotMatch(langApp.el('word-help-content').innerHTML,/[\u4e00-\u9fff]/);
-assert.equal(langApp.el('random').textContent,'Random');assert.equal(langApp.el('catalog').textContent,'Choose words');
+assert.equal(langApp.el('random').textContent,'Shuffle');assert.equal(langApp.el('catalog').textContent,'Choose words');
 assert.equal(langApp.el('category-compound').textContent,'One word');assert.equal(langApp.el('category-pair').textContent,'Two words');
 assert.equal(langApp.el('language-en').attributes['aria-current'],'page');
 assert.equal(langApp.el('search').attributes['aria-label'],'Search word groups in English or Chinese');

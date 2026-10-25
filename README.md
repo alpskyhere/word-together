@@ -22,13 +22,15 @@ Language-specific links take priority, followed by your saved language choice, t
 
 Some combinations have a meaning of their own, such as `hot dog` and `butterfly`. Open **Word notes** for an explanation in the interface language. Notes start closed and close when you move to another group.
 
-Use **Choose words** to search in English or Chinese, **Random** to pick another group, and **Practice later** to save a group to your practice list. Colors show word parts, not syllables; this game is not a complete phonics course.
+Use **Choose words** to search in English or Chinese, **Shuffle** to rearrange the groups, and **Practice later** to save a group to your practice list. Colors show word parts, not syllables; this game is not a complete phonics course.
 
 ## Categories and sorting
 
-Choose **All / One word / Two words**. Sort by **Suggested order**, **Alphabetical A–Z / Z–A**, or **Shortest first**. Alphabetical order ignores spaces; shortest first counts letters, with A–Z for ties.
+Choose **All / One word / Two words**. Sort by **Suggested order**, **Alphabetical A–Z / Z–A**, **Shortest first**, or **Shuffled order**. Alphabetical order ignores spaces; shortest first counts letters, with A–Z for ties.
 
 Changing the sort starts at the first group in the current selection and preserves learning records. The chooser and practice list follow the same sort.
+
+Each click on **Shuffle** creates a different order from the previous one and starts at the first group. **All** includes all 117 groups; a category or practice list shows only its matching groups. **Next group** follows the new order without repeats in a complete pass. Reloading preserves the order and position. With fewer than two groups, shuffling is unavailable.
 
 ## Progress and offline use
 
@@ -51,4 +53,4 @@ python3 test_site.py
 node test_app.cjs
 ```
 
-Updated (California time): **10/25/2026 10:56 PDT (UTC-07:00)** · [Release information](release.json)
+Updated (California time): **10/25/2026 11:03 PDT (UTC-07:00)** · [Release information](release.json)

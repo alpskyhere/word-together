@@ -153,4 +153,17 @@ class SiteTests(unittest.TestCase):
             doc=(ROOT/filename).read_text()
             for text in terms:self.assertIn(text,doc)
 
+    def test_shuffle_is_an_order_and_documented_in_both_languages(self):
+        self.assertIn('id="random" type="button">打乱顺序</button>',self.html)
+        self.assertIn('<option id="sort-shuffle" value="shuffle">随机顺序</option>',self.html)
+        self.assertEqual(self.data['ui']['en']['random'],'Shuffle')
+        self.assertEqual(self.data['ui']['en']['shuffle'],'Shuffled order')
+        for filename,terms in [('README.md',('different order from the previous one','117 groups','Reloading preserves the order and position')),('README.zh-CN.md',('与上一次不同的顺序','117 组','刷新后保留顺序和位置'))]:
+            doc=(ROOT/filename).read_text()
+            for text in terms:self.assertIn(text,doc)
+        for filename in ('README.md','README.zh-CN.md'):
+            doc=(ROOT/filename).read_text()
+            self.assertNotIn('随机一组',doc)
+            self.assertNotIn('**Random**',doc)
+
 if __name__=='__main__':unittest.main()
