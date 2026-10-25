@@ -138,6 +138,42 @@ class SiteTests(unittest.TestCase):
         self.assertEqual(files,expected)
         self.assertFalse(re.search(r'(?:href|src)\s*=\s*[\"\'][^\"\']*\.pdf(?:[?#\"\'])',self.html,re.I))
 
+    def test_simplified_interface_structure(self):
+        class Structure(HTMLParser):
+            def __init__(self):
+                super().__init__();self.stack=[];self.parents={};self.duplicates=[]
+            def handle_starttag(self,tag,attrs):
+                attrs=dict(attrs);identity=attrs.get('id')
+                if identity:
+                    if identity in self.parents:self.duplicates.append(identity)
+                    self.parents[identity]=[item[1] for item in self.stack if item[1]]
+                if tag not in {'area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'}:
+                    self.stack.append((tag,identity))
+            def handle_endtag(self,tag):
+                for index in range(len(self.stack)-1,-1,-1):
+                    if self.stack[index][0]==tag:
+                        del self.stack[index:];break
+        structure=Structure();structure.feed(self.html)
+        self.assertEqual(structure.duplicates,[])
+        for panel,controls in {
+            'library-panel':('filters','sort-order','review-only','learning-status','search','library'),
+            'settings-panel':('auto-read','celebrate','celebration-sound','fullscreen','preview-celebration'),
+            'feedback-panel':('feedback-link','feedback-browse','feedback-notice'),
+        }.items():
+            for control in controls:
+                self.assertIn(panel,structure.parents[control],control)
+                self.assertNotIn('main-ui',structure.parents[control],control)
+        for control in ('catalog','settings','feedback','reveal','next'):
+            self.assertIn('main-ui',structure.parents[control])
+        self.assertNotIn('role="progressbar"',self.html)
+        self.assertNotIn('progress',structure.parents)
+        self.assertNotIn('sort-za',structure.parents)
+        self.assertEqual(self.data['ui']['zh']['review'],'复习清单')
+        self.assertEqual(self.data['ui']['en']['review'],'Review list')
+        # The VM mock creates elements lazily; real HTML must supply every ID.
+        for identity in re.findall(r"\$\('([^']+)'\)",self.html):
+            self.assertIn(identity,structure.parents)
+
     def test_public_feedback_links_and_documentation(self):
         class Links(HTMLParser):
             def __init__(self):

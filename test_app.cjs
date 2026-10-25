@@ -7,7 +7,7 @@ function memoryStorage(initial={}){
 }
 function boot({storage=memoryStorage(),data=payload,url='https://example.test/?lang=zh',languages=['zh-CN'],reducedMotion=false,audioContext}={}){
   const elements=new Map();
-  function el(id){if(!elements.has(id))elements.set(id,{id,style:{},dataset:{},attributes:{},textContent:'',innerHTML:'',value:'',hidden:['overlay','celebration'].includes(id),setAttribute(k,v){this.attributes[k]=String(v)},getAttribute(k){return this.attributes[k]??null},focus(){context.document.activeElement=this;},querySelectorAll(){return[]}});return elements.get(id)}
+  function el(id){if(!elements.has(id))elements.set(id,{id,style:{},dataset:{},attributes:{},textContent:'',innerHTML:'',value:'',hidden:['overlay','celebration','settings-panel','feedback-panel'].includes(id),setAttribute(k,v){this.attributes[k]=String(v)},getAttribute(k){return this.attributes[k]??null},focus(){context.document.activeElement=this;},getClientRects(){return this.hidden?[]:[{}]},querySelectorAll(){return[]}});return elements.get(id)}
   el('word-data').textContent=data;
   el('updated-at').setAttribute('datetime',html.match(/<time id="updated-at" datetime="([^"]+)"/)[1]);
   const filters=filterKeys.map(k=>{let e=el('filter-'+k);e.dataset.filter=k;return e});
@@ -15,7 +15,7 @@ function boot({storage=memoryStorage(),data=payload,url='https://example.test/?l
   const location=new URL(url),historyWrites=[];
   const history={replaceState(_state,_title,next){historyWrites.push(next);location.href=next;}};
   let timerId=0;const timers=new Map();
-  const context=vm.createContext({document:{documentElement:el('document-root'),title:'',getElementById:el,querySelector:()=>el('progressbar'),querySelectorAll:()=>filters,addEventListener(type,fn){handlers[type]=fn}},window:{AudioContext:audioContext,localStorage:storage,location,history,navigator:{languages,language:languages[0]},matchMedia:()=>({matches:reducedMotion}),addEventListener(type,fn){handlers[type]=fn}},setTimeout(fn,ms){const id=++timerId;timers.set(id,{fn,ms});return id},clearTimeout(id){timers.delete(id)},console,Math:Object.create(Math),URL,URLSearchParams});
+  const context=vm.createContext({document:{documentElement:el('document-root'),title:'',getElementById:el,querySelectorAll:()=>filters,addEventListener(type,fn){handlers[type]=fn}},window:{AudioContext:audioContext,localStorage:storage,location,history,navigator:{languages,language:languages[0]},matchMedia:()=>({matches:reducedMotion}),addEventListener(type,fn){handlers[type]=fn}},setTimeout(fn,ms){const id=++timerId;timers.set(id,{fn,ms});return id},clearTimeout(id){timers.delete(id)},console,Math:Object.create(Math),URL,URLSearchParams});
   vm.runInContext(source,context);
   return {context,el,handlers,filters,storage,location,historyWrites,timers,run:s=>vm.runInContext(s,context)};
 }
@@ -109,13 +109,13 @@ handlers.keydown(space);assert.equal(run('position'),1);assert.equal(run('reveal
 handlers.keydown({...space,target:{...space.target,tagName:'BUTTON'}});
 assert.equal(run('revealed'),false); // Native button activation must not double-fire.
 console.log('Primary forward flow, secondary review, full-deck loop, filtered restart and keyboard checks passed.');
-// Selecting from another category must select the requested card and focus Play.
-run("setFilter('compound');openLibrary()");
+// The chooser respects its filters; selecting a visible result focuses Play.
+run("setFilter('pair');openLibrary()");
 el('search').value=' CHOCOLATE ';el('search').oninput();
 assert.match(el('library').innerHTML,/chocolate cake/);
 const chosen=run("ALL.find(c=>c.word==='chocolate cake').id");
 el('library').onclick({target:{closest:()=>({dataset:{id:String(chosen)}})}});
-assert.equal(run('filter'),'all');assert.equal(run('deck[position].id'),chosen);
+assert.equal(run('filter'),'pair');assert.equal(run('deck[position].id'),chosen);
 assert.equal(el('overlay').hidden,true);assert.equal(context.document.activeElement,el('reveal'));
 el('reveal').onclick();assert.equal(run('revealed'),true);
 run('openLibrary()');const before=run('position');handlers.keydown(space);
@@ -179,7 +179,7 @@ console.log('All 141 colored word joins, one listening control per card, concise
 // The collapsed help remains keyboard-accessible when search has no results.
 run('openLibrary()');el('search').value='zzzz';el('search').oninput();
 const summary=el('help-summary');
-el('overlay').querySelectorAll=selector=>{assert.equal(selector,'button,input,summary');return [el('close'),el('search'),summary];};
+el('overlay').querySelectorAll=selector=>{assert.equal(selector,'button,input,select,summary,a[href]');return [el('close'),el('search'),summary];};
 let tabPrevented=false;
 const tabKey={...space,key:'Tab',code:'Tab',preventDefault(){tabPrevented=true}};
 el('search').focus();handlers.keydown(tabKey);assert.equal(tabPrevented,false);
@@ -190,6 +190,73 @@ run('closeLibrary()');
 // Persisted learning state is separate from rendering and never contains artwork
 // or child/account data. A fresh VM simulates a reload or a new site version.
 const storageKey='word-together:learning:v1';
+// Browsing any panel must be read-only and keep focus inside its visible content.
+const panels=boot();
+const panelState=()=>panels.run('JSON.stringify({position,revealed,completed:[...completed],review:[...review],batch:[...celebrationBatch]})');
+const originalPanelState=panelState();
+for(const [panel,opener,title] of [['library','catalog','选一组词'],['settings','settings','设置'],['feedback','feedback','反馈']]){
+  panels.el(opener).onclick();
+  assert.equal(panels.el('overlay').hidden,false);assert.equal(panels.el('main-ui').inert,true);
+  assert.equal(panels.el('library-title').textContent,title);
+  for(const candidate of ['library','settings','feedback'])assert.equal(panels.el(candidate+'-panel').hidden,candidate!==panel);
+  assert.equal(panels.el(opener).getAttribute('aria-expanded'),'true');
+  assert.equal(panels.context.document.activeElement,panels.el(panel==='library'?'search':'close'));
+  panels.handlers.keydown(space);panels.handlers.keydown({...space,key:'ArrowRight',code:'ArrowRight'});
+  assert.equal(panelState(),originalPanelState);
+  panels.handlers.keydown({...space,key:'Escape',code:'Escape'});
+  assert.equal(panels.el('overlay').hidden,true);assert.equal(panels.el('main-ui').inert,false);
+  assert.equal(panels.el(opener).getAttribute('aria-expanded'),'false');
+  assert.equal(panels.context.document.activeElement,panels.el(opener));
+}
+panels.el('feedback').onclick();
+panels.el('overlay').onclick({target:panels.el('feedback-panel')});assert.equal(panels.el('overlay').hidden,false);
+panels.el('overlay').onclick({target:panels.el('overlay')});assert.equal(panels.context.document.activeElement,panels.el('feedback'));
+assert.equal(panels.storage.writes.length,0);
+for(const [panel,last] of [['library','sort-order'],['feedback','feedback-browse']]){
+  panels.run(`openPanel('${panel}')`);
+  const invisible=panels.el('invisible-descendant');invisible.getClientRects=()=>[];
+  const disabled=panels.el('disabled-control');disabled.disabled=true;
+  panels.el('overlay').querySelectorAll=()=>[invisible,disabled,panels.el('close'),panels.el(last),invisible,disabled];
+  panels.el('close').focus();panels.handlers.keydown({...tabKey,shiftKey:true});
+  assert.equal(panels.context.document.activeElement,panels.el(last));
+  panels.handlers.keydown(tabKey);assert.equal(panels.context.document.activeElement,panels.el('close'));
+  panels.run('closeLibrary()');
+}
+const englishPanels=boot({url:'https://example.test/?lang=en'});
+for(const [panel,title] of [['library','Choose a word group'],['settings','Settings'],['feedback','Feedback']]){
+  englishPanels.run(`openPanel('${panel}')`);assert.equal(englishPanels.el('library-title').textContent,title);
+}
+assert.equal(englishPanels.el('review-only').textContent,'Review list 0');
+assert.equal(englishPanels.el('next').textContent,'Skip');
+
+// A single prominent forward action; skipping is only available before reveal.
+const forward=boot();
+assert.equal(forward.el('next').hidden,false);forward.el('next').onclick();assert.equal(forward.run('position'),1);
+forward.el('reveal').onclick();assert.equal(forward.el('next').hidden,true);
+forward.el('split').onclick();assert.equal(forward.el('next').hidden,false);
+forward.el('reveal').onclick();forward.el('reveal').onclick();assert.equal(forward.run('position'),2);
+forward.run('move(999)');assert.equal(forward.el('next').hidden,true);
+forward.el('reveal').onclick();forward.el('split').onclick();assert.equal(forward.el('next').hidden,true);
+
+// Legacy reverse alphabetical records migrate without losing position or lists.
+const zaStore=memoryStorage({[storageKey]:JSON.stringify({version:1,sortOrder:'za',currentId:75,completed:[0,75],review:[75],autoRead:false})});
+const zaUpgrade=boot({storage:zaStore});
+assert.equal(zaUpgrade.run('sortOrder'),'az');assert.equal(zaUpgrade.run('deck[position].id'),75);
+assert.equal(zaUpgrade.run('completed.size'),2);assert.equal(zaUpgrade.run('review.has(75)'),true);
+assert.equal(zaUpgrade.run('autoRead'),false);assert.equal(zaStore.writes.length,0);
+
+// Category, review mode and search describe the same selection.
+const scoped=boot();scoped.run("review=new Set([4,75]);toggleReviewOnly();setFilter('pair');openLibrary()");
+const scopedIds=()=>[...scoped.el('library').innerHTML.matchAll(/data-id="(\d+)"/g)].map(m=>Number(m[1]));
+assert.deepEqual(scopedIds(),[75]);
+scoped.el('search').value='snow';scoped.el('search').oninput();assert.deepEqual(scopedIds(),[]);
+const scopedPosition=scoped.run('position'),scopedWrites=scoped.storage.writes.length;
+scoped.el('library').onclick({target:{closest:()=>({dataset:{id:'4'}})}});
+assert.equal(scoped.run('position'),scopedPosition);assert.equal(scoped.storage.writes.length,scopedWrites);
+assert.equal(scoped.el('overlay').hidden,false);
+scoped.run("setFilter('compound')");assert.deepEqual(scopedIds(),[4]);
+scoped.run('toggleReviewOnly()');assert.ok(scopedIds().length>1); // Search remains active after exit.
+console.log('Simplified interface passed: read-only panels, focus trap, bilingual labels, single forward action, scoped chooser and legacy Z–A migration.');
 for(const id of ['review-card','review-only','learning-status','save-note'])assert.ok(html.includes(`id="${id}"`));
 const savedStore=memoryStorage({'another-app':'keep me'});
 const first=boot({storage:savedStore});
@@ -223,7 +290,7 @@ assert.notEqual(reordered.run('position'),reloaded.run('position'));
 reloaded.run("setFilter('pair')");const pairId=reloaded.run('deck[position].id');
 reloaded.el('review-card').onclick();reloaded.el('review-only').onclick();
 assert.equal(reloaded.run('reviewOnly'),true);assert.equal(reloaded.run('deck.length'),2);
-assert.equal(reloaded.el('compound-count').textContent,91);assert.equal(reloaded.el('pair-count').textContent,50);
+assert.equal(reloaded.el('compound-count').textContent,1);assert.equal(reloaded.el('pair-count').textContent,1);
 reloaded.run("setFilter('pair')");
 assert.equal(reloaded.run('deck.length'),1);assert.equal(reloaded.run('deck[0].id'),pairId);
 assert.equal(reloaded.el('random').disabled,true);
@@ -235,11 +302,12 @@ reviewReload.el('review-card').onclick(); // Remove the last card of this catego
 assert.equal(reviewReload.run('deck.length'),0);assert.match(reviewReload.el('cards').innerHTML,/还没有/);
 assert.equal(reviewReload.el('reveal').disabled,true);assert.equal(reviewReload.el('review-card').hidden,true);
 assert.equal(reviewReload.el('prev').disabled,true);assert.equal(reviewReload.el('next').disabled,true);
-assert.equal(reviewReload.el('progressbar').attributes['aria-valuenow'],'0');
+assert.equal(reviewReload.el('next').hidden,true);assert.equal(reviewReload.context.document.activeElement,reviewReload.el('catalog'));
 assert.doesNotThrow(()=>reviewReload.run('primaryAction();move(1);move(-1);shuffleDeck()'));
 reviewReload.run("setFilter('compound')");assert.equal(reviewReload.run('deck[0].id'),resumeId);
 reviewReload.el('review-card').onclick();assert.equal(reviewReload.run('review.size'),0);
-reviewReload.run('openLibrary()');assert.match(reviewReload.el('library').innerHTML,/snowman/);
+reviewReload.run('openLibrary()');assert.match(reviewReload.el('library').innerHTML,/没有找到/);
+reviewReload.el('review-only').onclick();assert.match(reviewReload.el('library').innerHTML,/snowman/);
 reviewReload.el('library').onclick({target:{closest:()=>({dataset:{id:String(pairId)}})}});
 assert.equal(reviewReload.run('reviewOnly'),false);assert.equal(reviewReload.run('deck.length'),141);
 assert.equal(reviewReload.run('deck[position].id'),pairId);
@@ -354,7 +422,7 @@ console.log('Persistence passed: reload, stable IDs, unique revealed counts, rev
 assert.match(html,/<button data-filter="compound" aria-pressed="false"><span id="category-compound">连着写<\/span> <span id="compound-count"><\/span><\/button>/);
 assert.match(html,/<button data-filter="pair" aria-pressed="false"><span id="category-pair">分开写<\/span> <span id="pair-count"><\/span><\/button>/);
 assert.doesNotMatch(html,/合成一个词|保留两个词/);
-assert.deepEqual([...html.matchAll(/<option id="[^"]+" value="([^"]+)">/g)].map(m=>m[1]),['recommended','az','za','short','shuffle']);
+assert.deepEqual([...html.matchAll(/<option id="[^"]+" value="([^"]+)">/g)].map(m=>m[1]),['recommended','az','short','shuffle']);
 const sortedStore=memoryStorage(),sorting=boot({storage:sortedStore});
 const baseCards=JSON.parse(payload).cards;
 const spellingOf=c=>c.word.replace(/\s/g,'');
@@ -365,7 +433,7 @@ sorting.el('sort-order').onchange({target:{value:'az'}});
 assert.deepEqual(ids(sorting),expectedAz.map(c=>c.id));assert.equal(sorting.run('position'),0);assert.equal(sorting.run('revealed'),false);
 assert.equal(sorting.run('deck[0].word'),'airplane');assert.equal(sorting.run('completed.size'),completionBefore);
 sorting.run('move(1)');assert.equal(sorting.run('deck[position].word'),'airport');
-sorting.run("setSort('za')");assert.deepEqual(ids(sorting),expectedAz.map(c=>c.id).reverse());
+sorting.run("setSort('za')");assert.deepEqual(ids(sorting),expectedAz.map(c=>c.id)); // Removed option is ignored.
 sorting.run("setSort('short')");assert.deepEqual(ids(sorting),expectedShort.map(c=>c.id));
 sorting.run("setFilter('pair')");assert.deepEqual(ids(sorting),expectedShort.filter(c=>c.kind==='pair').map(c=>c.id));
 sorting.run("setSort('az');move(2)");const sortedCurrent=sorting.run('deck[position].id');
@@ -375,10 +443,10 @@ assert.equal(sortingReload.el('sort-order').value,'az');assert.equal(sortingRelo
 assert.equal(sortingReload.run('filter'),'pair');
 sortingReload.run('openLibrary()');sortingReload.el('search').value='apple';sortingReload.el('search').oninput();
 const libraryIds=[...sortingReload.el('library').innerHTML.matchAll(/data-id="(\d+)"/g)].map(m=>Number(m[1]));
-assert.deepEqual(libraryIds,expectedAz.filter(c=>[c.a,c.b,c.word].some(w=>w.includes('apple'))).map(c=>c.id));
+assert.deepEqual(libraryIds,expectedAz.filter(c=>c.kind==='pair'&&[c.a,c.b,c.word].some(w=>w.includes('apple'))).map(c=>c.id));
 sortingReload.run('closeLibrary();toggleReview();move(1);toggleReview();toggleReviewOnly()');
 assert.equal(sortingReload.run('deck.length'),2);
-sortingReload.run("setSort('za')");assert.deepEqual(ids(sortingReload),expectedAz.filter(c=>sortingReload.run(`review.has(${c.id})`)).map(c=>c.id).reverse());
+sortingReload.run("setSort('az')");assert.deepEqual(ids(sortingReload),expectedAz.filter(c=>sortingReload.run(`review.has(${c.id})`)).map(c=>c.id));
 sortingReload.run('toggleReview();toggleReview()');assert.equal(sortingReload.run('deck.length'),0);
 assert.doesNotThrow(()=>sortingReload.run("setSort('short');primaryAction();shuffleDeck()"));
 assert.equal(sortingReload.el('reveal').disabled,true);
@@ -393,7 +461,7 @@ assert.equal(sorting.run('position'),selectBefore);
 const localSort=boot();localSort.run("setSort('az');move(4)");const localSortId=localSort.run('deck[position].id');
 localSort.handlers.storage({key:storageKey,newValue:JSON.stringify({version:1,sortOrder:'za',completed:[],review:[],drawn:[]})});
 assert.equal(localSort.run('sortOrder'),'az');assert.equal(localSort.run('deck[position].id'),localSortId);
-console.log('Sorting passed: A–Z, Z–A, length, reset, search, filters, review, persistence, old records and cross-tab stability.');
+console.log('Sorting passed: A–Z, removed Z–A, length, reset, search, filters, review, persistence, old records and cross-tab stability.');
 
 // Word notes use the chosen interface language; learning words stay English.
 const chinese=boot(),hintWrites=chinese.storage.writes.length;
@@ -701,7 +769,7 @@ pendingParty.context.document.hidden=true;pendingParty.handlers.visibilitychange
 assert.equal(pendingParty.el('celebration').hidden,true);assert.ok(pending.nodes.every(n=>n.disconnected));
 
 const previewAudio=audioHarness(),preview=boot({audioContext:previewAudio.AudioContext});
-preview.run('openLibrary()');const previewState=preview.run('JSON.stringify({position,revealed,completed:[...completed],batch:[...celebrationBatch],lastCelebrationCard})');
+preview.run("openPanel('settings')");const previewState=preview.run('JSON.stringify({position,revealed,completed:[...completed],batch:[...celebrationBatch],lastCelebrationCard})');
 preview.el('preview-celebration').onclick();
 assert.equal(preview.run('JSON.stringify({position,revealed,completed:[...completed],batch:[...celebrationBatch],lastCelebrationCard})'),previewState);
 assert.equal(preview.storage.writes.length,0);assert.equal(preview.el('overlay').hidden,true);assert.equal(previewAudio.nodes.length,4);
