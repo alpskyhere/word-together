@@ -33,15 +33,15 @@ class SiteTests(unittest.TestCase):
 
     def test_vocabulary_and_categories(self):
         cards=self.data['cards']
-        self.assertEqual(len(cards),105)
-        self.assertEqual(len({c['word'] for c in cards}),105)
-        self.assertEqual(sum(c['kind']=='pair' for c in cards),32)
+        self.assertEqual(len(cards),117)
+        self.assertEqual(len({c['word'] for c in cards}),117)
+        self.assertEqual(sum(c['kind']=='pair' for c in cards),38)
         for card in cards:
             self.assertEqual(card['a']+card['b'],card['word'].replace(' ',''))
             self.assertEqual(card['kind']=='pair',' ' in card['word'])
 
     def test_all_art_is_available_and_valid(self):
-        self.assertEqual(len(self.data['art']),245)
+        self.assertEqual(len(self.data['art']),261)
         for card in self.data['cards']:
             for word in (card['a'],card['b'],card['word']):
                 root=ET.fromstring(self.data['art'][word])
@@ -70,10 +70,11 @@ class SiteTests(unittest.TestCase):
         readme=(ROOT/'README.md').read_text()
         release=json.loads((ROOT/'release.json').read_text())
         self.assertIn(release['updated_at'],readme)
-        self.assertIn(release['sha256'],readme)
+        self.assertIn('[版本信息](release.json)',readme)
         self.assertIn(f"{len(self.data['cards'])} 组词语组合",readme)
-        self.assertIn(f"{len(self.data['art'])} 个彩色 SVG",readme)
-        self.assertIn('https://github.com/alpskyhere/word-together',readme)
+        pairs=sum(c['kind']=='pair' for c in self.data['cards'])
+        self.assertIn(f"{len(self.data['cards'])-pairs} 组连着写、{pairs} 组分开写",readme)
+        self.assertIn('https://alpskyhere.github.io/word-together/',readme)
         self.assertNotIn('__UPDATED_AT__',readme)
         self.assertNotIn('__SHA256__',readme)
 
