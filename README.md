@@ -39,4 +39,4 @@ python3 test_site.py
 node test_app.cjs
 ```
 
-网页更新时间（UTC）：**2026-10-25T03:36:41Z** · [版本信息](release.json)
+网页更新时间（加州时间）：**10/24/2026 20:57 PDT (UTC-07:00)** · [版本信息](release.json)

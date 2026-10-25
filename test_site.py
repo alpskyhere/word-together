@@ -28,7 +28,11 @@ class SiteTests(unittest.TestCase):
         match=re.search(r'<time id="updated-at" datetime="([^"]+)"[^>]*>([^<]+)</time>',self.html)
         self.assertIsNotNone(match)
         self.assertEqual(match.group(1),release['updated_at'])
-        self.assertEqual(match.group(2),updated.date().isoformat())
+        visible=re.fullmatch(r'(\d{2}/\d{2}/\d{4} \d{2}:\d{2}) (PDT|PST) \(UTC([+-]\d{2}:\d{2})\)',match.group(2))
+        self.assertIsNotNone(visible)
+        self.assertEqual(visible.group(3),'-07:00' if visible.group(2)=='PDT' else '-08:00')
+        displayed=datetime.strptime(visible.group(1)+visible.group(3),'%m/%d/%Y %H:%M%z')
+        self.assertEqual(displayed,updated.replace(second=0,microsecond=0))
         self.assertIn('更新于 <time',self.html)
 
     def test_vocabulary_and_categories(self):
@@ -69,13 +73,15 @@ class SiteTests(unittest.TestCase):
     def test_readme_matches_this_release(self):
         readme=(ROOT/'README.md').read_text()
         release=json.loads((ROOT/'release.json').read_text())
-        self.assertIn(release['updated_at'],readme)
+        visible=re.search(r'<time id="updated-at"[^>]*>([^<]+)</time>',self.html).group(1)
+        self.assertIn(f'网页更新时间（加州时间）：**{visible}**',readme)
         self.assertIn('[版本信息](release.json)',readme)
         self.assertIn(f"{len(self.data['cards'])} 组词语组合",readme)
         pairs=sum(c['kind']=='pair' for c in self.data['cards'])
         self.assertIn(f"{len(self.data['cards'])-pairs} 组连着写、{pairs} 组分开写",readme)
         self.assertIn('https://alpskyhere.github.io/word-together/',readme)
         self.assertNotIn('__UPDATED_AT__',readme)
+        self.assertNotIn('__UPDATED_DISPLAY__',readme)
         self.assertNotIn('__SHA256__',readme)
 
     def test_package_has_no_pdf_or_extra_files(self):
