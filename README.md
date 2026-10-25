@@ -26,7 +26,7 @@ Some combinations have a meaning of their own, such as `hot dog` and `butterfly`
 
 Use **Choose words** to search in English or Chinese, **Shuffle** to rearrange the groups, and **Practice later** to save a group to your practice list. Colors show word parts, not syllables; this game is not a complete phonics course.
 
-**Celebrate** is off by default. Turn it on for silent confetti and a medal after every 10 different groups revealed in a batch, including practice. Repeated reveals within the batch do not count. The effect ends after 2.6 seconds and never blocks the controls or interrupts pronunciation. Reduced-motion settings show a still medal instead. The setting and unfinished batch stay in this browser; reloading does not replay a reward, and turning celebrations on again starts a new batch.
+**Celebrate** and **Sound** are on by default. Every 10 different groups revealed in a batch brings three waves of confetti, ribbons and stars, plus a medal. The visual effect ends after 3.6 seconds and never blocks the controls. A soft reward chime follows pronunciation; use **Sound** to mute it without muting words. Moving on, starting another pronunciation or hiding the tab cancels pending sound. Reduced-motion settings show a still medal. Try it from **Choose words → How to play → Preview celebration**, without changing progress. This update enables celebrations once for older records; later off/mute choices stay saved. Repeats within a batch do not count, reload does not replay rewards, and re-enabling celebrations starts a fresh batch.
 
 ## Categories and sorting
 
@@ -57,4 +57,4 @@ python3 test_site.py
 node test_app.cjs
 ```
 
-Updated (California time): **10/25/2026 13:36 PDT (UTC-07:00)** · [Release information](release.json)
+Updated (California time): **10/25/2026 13:51 PDT (UTC-07:00)** · [Release information](release.json)

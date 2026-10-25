@@ -175,13 +175,16 @@ class SiteTests(unittest.TestCase):
             self.assertNotIn('**Random**',doc)
 
     def test_optional_celebration_and_readme_link_guidance(self):
-        self.assertIn('id="celebrate" type="button" aria-pressed="false"',self.html)
+        self.assertIn('id="celebrate" type="button" aria-pressed="true"',self.html)
         self.assertIn('id="celebration" class="celebration" hidden',self.html)
+        self.assertIn('id="celebration-sound" type="button" aria-pressed="true"',self.html)
+        self.assertIn('id="preview-celebration"',self.html)
+        self.assertIn('confetti-burst',self.html)
         self.assertIn('pointer-events:none',self.html)
         self.assertIn('@media(prefers-reduced-motion:reduce){.confetti{display:none}}',self.html)
         self.assertEqual(self.data['ui']['en']['celebrationOff'],'Celebrate: off')
         self.assertEqual(self.data['ui']['zh']['celebrationOff'],'庆祝：关')
-        for filename,terms in [('README.md',('off by default','10 different groups','2.6 seconds','⌘-click','Ctrl-click')),('README.zh-CN.md',('默认关闭','10 个不同词组','2.6 秒','按住 ⌘','按住 Ctrl'))]:
+        for filename,terms in [('README.md',('on by default','10 different groups','3.6 seconds','⌘-click','Ctrl-click')),('README.zh-CN.md',('默认开启','10 个不同词组','3.6 秒','按住 ⌘','按住 Ctrl'))]:
             doc=(ROOT/filename).read_text()
             for term in terms:self.assertIn(term,doc)
             for lang in ('zh','en'):

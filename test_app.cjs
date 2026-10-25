@@ -5,7 +5,7 @@ function memoryStorage(initial={}){
   const values=new Map(Object.entries(initial)),writes=[];
   return {values,writes,getItem(key){return values.get(key)??null},setItem(key,value){writes.push(key);values.set(key,value)}};
 }
-function boot({storage=memoryStorage(),data=payload,url='https://example.test/?lang=zh',languages=['zh-CN'],reducedMotion=false}={}){
+function boot({storage=memoryStorage(),data=payload,url='https://example.test/?lang=zh',languages=['zh-CN'],reducedMotion=false,audioContext}={}){
   const elements=new Map();
   function el(id){if(!elements.has(id))elements.set(id,{id,style:{},dataset:{},attributes:{},textContent:'',innerHTML:'',value:'',hidden:['overlay','celebration'].includes(id),setAttribute(k,v){this.attributes[k]=String(v)},getAttribute(k){return this.attributes[k]??null},focus(){context.document.activeElement=this;},querySelectorAll(){return[]}});return elements.get(id)}
   el('word-data').textContent=data;
@@ -15,7 +15,7 @@ function boot({storage=memoryStorage(),data=payload,url='https://example.test/?l
   const location=new URL(url),historyWrites=[];
   const history={replaceState(_state,_title,next){historyWrites.push(next);location.href=next;}};
   let timerId=0;const timers=new Map();
-  const context=vm.createContext({document:{documentElement:el('document-root'),title:'',getElementById:el,querySelector:()=>el('progressbar'),querySelectorAll:()=>filters,addEventListener(type,fn){handlers[type]=fn}},window:{localStorage:storage,location,history,navigator:{languages,language:languages[0]},matchMedia:()=>({matches:reducedMotion}),addEventListener(type,fn){handlers[type]=fn}},setTimeout(fn,ms){const id=++timerId;timers.set(id,{fn,ms});return id},clearTimeout(id){timers.delete(id)},console,Math:Object.create(Math),URL,URLSearchParams});
+  const context=vm.createContext({document:{documentElement:el('document-root'),title:'',getElementById:el,querySelector:()=>el('progressbar'),querySelectorAll:()=>filters,addEventListener(type,fn){handlers[type]=fn}},window:{AudioContext:audioContext,localStorage:storage,location,history,navigator:{languages,language:languages[0]},matchMedia:()=>({matches:reducedMotion}),addEventListener(type,fn){handlers[type]=fn}},setTimeout(fn,ms){const id=++timerId;timers.set(id,{fn,ms});return id},clearTimeout(id){timers.delete(id)},console,Math:Object.create(Math),URL,URLSearchParams});
   vm.runInContext(source,context);
   return {context,el,handlers,filters,storage,location,historyWrites,timers,run:s=>vm.runInContext(s,context)};
 }
@@ -204,7 +204,7 @@ first.el('review-card').onclick();first.el('auto-read').onclick();
 let record=JSON.parse(savedStore.getItem(storageKey));
 assert.equal(record.currentId,resumeId);assert.equal(record.autoRead,false);
 assert.deepEqual(record.completed,[resumeId]);assert.deepEqual(record.review,[resumeId]);
-assert.deepEqual(Object.keys(record).sort(),['autoRead','completed','currentId','shuffleIds','filter','review','reviewOnly','sortOrder','version','celebrationEnabled','celebrationBatch','lastCelebrationCard'].sort());
+assert.deepEqual(Object.keys(record).sort(),['autoRead','completed','currentId','shuffleIds','filter','review','reviewOnly','sortOrder','version','celebrationDefaultsVersion','celebrationEnabled','celebrationSoundEnabled','celebrationBatch','lastCelebrationCard'].sort());
 assert.equal(savedStore.getItem('another-app'),'keep me');
 assert.ok(savedStore.writes.every(k=>k===storageKey));
 const writesBeforeReload=savedStore.writes.length;
@@ -549,10 +549,13 @@ console.log('Public feedback passed: repository, bilingual drafts, current word/
 // Optional celebrations count reveals, not navigation, audio or repeated clicks.
 function revealIndex(app,index){app.run(`position=${index};revealed=false;render()`);app.el('reveal').onclick();}
 const party=boot();
-assert.equal(party.run('celebrationEnabled'),false);
-assert.equal(party.el('celebrate').textContent,'庆祝：关');
-assert.equal(party.el('celebrate').getAttribute('aria-pressed'),'false');
+assert.equal(party.run('celebrationEnabled'),true);
+assert.equal(party.run('celebrationSoundEnabled'),true);
+assert.equal(party.el('celebrate').textContent,'庆祝：开');
+assert.equal(party.el('celebrate').getAttribute('aria-pressed'),'true');
 assert.equal(party.storage.writes.length,0);
+party.el('celebrate').onclick(); // Explicit off still suppresses rewards.
+assert.equal(party.el('celebration-sound').disabled,true);
 for(let i=0;i<20;i++)revealIndex(party,i);
 assert.equal(party.el('celebration').hidden,true);
 assert.equal(party.run('celebrationBatch.size'),0);
@@ -566,12 +569,12 @@ party.el('next').onclick();assert.equal(party.run('celebrationBatch.size'),9);
 party.el('reveal').focus();revealIndex(party,9);
 assert.equal(party.el('celebration').hidden,false);
 assert.equal(party.run('celebrationBatch.size'),0);
-assert.equal((party.el('confetti').innerHTML.match(/<i /g)||[]).length,24);
+assert.equal((party.el('confetti').innerHTML.match(/<i /g)||[]).length,180);
 assert.equal(party.context.document.activeElement,party.el('reveal'));
 assert.equal(party.el('celebration-text').textContent,'太棒了！完成 10 组！');
 party.run("setLanguage('en')");assert.equal(party.el('celebration-text').textContent,'Great work! 10 groups done!');
 assert.equal(party.el('celebrate').textContent,'Celebrate: on');
-const partyTimer=[...party.timers.values()].find(t=>t.ms===2600);assert.ok(partyTimer);partyTimer.fn();
+const partyTimer=[...party.timers.values()].find(t=>t.ms===3600);assert.ok(partyTimer);partyTimer.fn();
 assert.equal(party.el('celebration').hidden,true);assert.equal(party.el('confetti').innerHTML,'');
 party.run('showParts()');party.el('reveal').onclick();assert.equal(party.run('celebrationBatch.size'),0);
 for(let i=10;i<20;i++)revealIndex(party,i);
@@ -590,7 +593,7 @@ const afterReward=boot({storage:party.storage});
 assert.equal(afterReward.el('celebration').hidden,true);assert.equal(afterReward.run('celebrationBatch.size'),0);
 revealIndex(afterReward,9);assert.equal(afterReward.run('celebrationBatch.size'),0);
 // Reduced motion uses the same milestone and cleanup, with no falling particles.
-const quietParty=boot({reducedMotion:true});quietParty.el('celebrate').onclick();
+const quietParty=boot({reducedMotion:true});
 for(let i=0;i<10;i++)revealIndex(quietParty,i);
 assert.equal(quietParty.el('celebration').hidden,false);assert.equal(quietParty.el('confetti').innerHTML,'');
 quietParty.run('openLibrary()');assert.equal(quietParty.el('celebration').hidden,true);
@@ -599,17 +602,17 @@ const receiver=boot();const writes=receiver.storage.writes.length;
 receiver.handlers.storage({key:storageKey,newValue:party.storage.getItem(storageKey)});
 assert.equal(receiver.run('celebrationEnabled'),true);assert.equal(receiver.el('celebration').hidden,true);
 assert.equal(receiver.storage.writes.length,writes);
-receiver.handlers.storage({key:storageKey,newValue:null});assert.equal(receiver.run('celebrationEnabled'),false);
+receiver.handlers.storage({key:storageKey,newValue:null});assert.equal(receiver.run('celebrationEnabled'),true);
 const oldProgress=boot({storage:memoryStorage({[storageKey]:JSON.stringify({version:1,completed:[0,1]})})});
-assert.equal(oldProgress.run('completed.size'),2);assert.equal(oldProgress.run('celebrationEnabled'),false);
+assert.equal(oldProgress.run('completed.size'),2);assert.equal(oldProgress.run('celebrationEnabled'),true);
 for(const badBatch of [null,'bad',Array.from({length:11},(_,i)=>i)]){
  const bad=boot({storage:memoryStorage({[storageKey]:JSON.stringify({version:1,celebrationEnabled:true,celebrationBatch:badBatch})})});
  assert.equal(bad.run('celebrationBatch.size'),0);assert.equal(bad.el('celebration').hidden,true);
 }
 const sessionParty=boot({storage:{getItem(){throw Error('Blocked')},setItem(){throw Error('Blocked')}}});
-assert.doesNotThrow(()=>{sessionParty.el('celebrate').onclick();for(let i=0;i<10;i++)revealIndex(sessionParty,i)});
+assert.doesNotThrow(()=>{for(let i=0;i<10;i++)revealIndex(sessionParty,i)});
 assert.equal(sessionParty.el('celebration').hidden,false);
-console.log('Celebrations passed: default off, distinct groups, repeat prevention, each ten, timers, focus, bilingual copy, persistence, reduced motion, cross-tab reads, legacy/corrupt/blocked storage.');
+console.log('Celebrations passed: default on, distinct groups, repeat prevention, each ten, timers, focus, bilingual copy, persistence, reduced motion, cross-tab reads, legacy/corrupt/blocked storage.');
 
 // New groups must be additions, with stable IDs and all component artwork.
 const additions=boot();
@@ -642,3 +645,100 @@ for(const invalid of [legacyOrder.slice(1),legacyOrder.map((id,i)=>i===0?115:id)
  assert.equal(incomplete.run('sortOrder'),'recommended');
 }
 console.log('24 additions passed: exact stable IDs, counts, shell context, Chinese search and 117-card progress/shuffle/celebration migration.');
+
+// Upgrading the old off-by-default release enables rewards once, while new
+// explicit preferences survive reload and never write during page reads.
+const defaultUpgrade=boot({storage:memoryStorage({[storageKey]:JSON.stringify({version:1,completed:[3],celebrationEnabled:false})})});
+assert.equal(defaultUpgrade.run('celebrationEnabled'),true);assert.equal(defaultUpgrade.run('completed.has(3)'),true);
+assert.equal(defaultUpgrade.storage.writes.length,0);
+defaultUpgrade.el('celebration-sound').onclick();defaultUpgrade.el('celebrate').onclick();
+const preferences=JSON.parse(defaultUpgrade.storage.getItem(storageKey));
+assert.equal(preferences.celebrationDefaultsVersion,2);assert.equal(preferences.celebrationSoundEnabled,false);
+const keptOff=boot({storage:defaultUpgrade.storage});
+assert.equal(keptOff.run('celebrationEnabled'),false);assert.equal(keptOff.run('celebrationSoundEnabled'),false);
+assert.equal(keptOff.el('preview-celebration').disabled,true);
+
+function audioHarness(initialState='running'){
+ const contexts=[],nodes=[],gains=[];let resumeCalls=0,resumeResolve,resumeReject;
+ class AudioContext{
+  constructor(){this.state=initialState;this.currentTime=10;this.destination={};contexts.push(this);}
+  resume(){resumeCalls++;return new Promise((resolve,reject)=>{resumeResolve=()=>{this.state='running';resolve()};resumeReject=reject});}
+  createOscillator(){const node={frequency:{setValueAtTime(value,time){node.frequencyValue=value;node.frequencyTime=time}},connect(){},disconnect(){node.disconnected=true},start(at){node.started=at},stop(at){node.stops.push(at)},stops:[]};nodes.push(node);return node;}
+  createGain(){const gain={events:[],connect(){},disconnect(){gain.disconnected=true}};gain.gain={setValueAtTime:(...v)=>gain.events.push(['set',...v]),linearRampToValueAtTime:(...v)=>gain.events.push(['linear',...v]),exponentialRampToValueAtTime:(...v)=>gain.events.push(['exponential',...v])};gains.push(gain);return gain;}
+ }
+ return {AudioContext,contexts,nodes,gains,get resumeCalls(){return resumeCalls},resolve(){resumeResolve()},reject(){resumeReject(new Error('Audio blocked'))}};
+}
+function attachSpeech(app){
+ const utterances=[];
+ app.context.window.SpeechSynthesisUtterance=function(text){this.text=text};
+ app.context.window.speechSynthesis={cancel(){},getVoices(){return[]},speak(u){utterances.push(u)}};
+ return utterances;
+}
+const chime=audioHarness(),soundParty=boot({audioContext:chime.AudioContext}),utterances=attachSpeech(soundParty);
+assert.equal(chime.contexts.length,0); // Default on never makes noise just by loading.
+for(let i=0;i<9;i++)revealIndex(soundParty,i);
+assert.equal(chime.contexts.length,0);revealIndex(soundParty,9);
+assert.equal(chime.contexts.length,1);assert.equal(chime.nodes.length,0); // Wait for pronunciation.
+utterances.at(-1).onend();assert.equal(chime.nodes.length,4);
+utterances.at(-1).onend();assert.equal(chime.nodes.length,4); // Duplicate callback is harmless.
+assert.deepEqual(chime.nodes.map(n=>n.frequencyValue),[523.25,659.25,783.99,1046.5]);
+assert.ok(chime.nodes.every(n=>n.type==='sine'&&n.stops[0]-n.started<.51));
+assert.ok(chime.gains.every(g=>g.events[0][1]===0&&g.events[1][1]===.07&&g.events[2][1]===.001));
+soundParty.run("say('snow')");assert.ok(chime.nodes.every(n=>n.disconnected));
+assert.equal(chime.contexts.length,1); // Reuse the context; never accumulate one per reward.
+utterances.at(-2).onend();assert.equal(chime.nodes.length,4);
+
+const pending=audioHarness(),pendingParty=boot({audioContext:pending.AudioContext}),pendingWords=attachSpeech(pendingParty);
+for(let i=0;i<10;i++)revealIndex(pendingParty,i);
+pendingParty.el('next').onclick();pendingWords.at(-1).onend();assert.equal(pending.nodes.length,0);
+for(let i=10;i<20;i++)revealIndex(pendingParty,i);
+pendingParty.el('celebration-sound').onclick();pendingWords.at(-1).onend();assert.equal(pending.nodes.length,0);
+assert.equal(pendingParty.el('celebration').hidden,false); // Mute keeps the visual reward.
+pendingParty.el('celebration-sound').onclick();pendingParty.el('auto-read').onclick();
+for(let i=20;i<30;i++)revealIndex(pendingParty,i);
+assert.equal(pending.nodes.length,4); // With auto-read off the reward sounds immediately.
+pendingParty.context.document.hidden=true;pendingParty.handlers.visibilitychange();
+assert.equal(pendingParty.el('celebration').hidden,true);assert.ok(pending.nodes.every(n=>n.disconnected));
+
+const previewAudio=audioHarness(),preview=boot({audioContext:previewAudio.AudioContext});
+preview.run('openLibrary()');const previewState=preview.run('JSON.stringify({position,revealed,completed:[...completed],batch:[...celebrationBatch],lastCelebrationCard})');
+preview.el('preview-celebration').onclick();
+assert.equal(preview.run('JSON.stringify({position,revealed,completed:[...completed],batch:[...celebrationBatch],lastCelebrationCard})'),previewState);
+assert.equal(preview.storage.writes.length,0);assert.equal(preview.el('overlay').hidden,true);assert.equal(previewAudio.nodes.length,4);
+assert.equal((preview.el('confetti').innerHTML.match(/<i /g)||[]).length,180);
+for(const shape of ['ribbon','star','dot','chip'])assert.ok(preview.el('confetti').innerHTML.includes(`class="${shape}"`));
+assert.ok(preview.el('confetti').innerHTML.includes('--x:2%'));assert.ok(preview.el('confetti').innerHTML.includes('--x:98%'));
+preview.run("setLanguage('en')");assert.equal(preview.el('celebration-sound').textContent,'Sound: on');
+assert.equal(preview.el('preview-celebration').textContent,'Preview celebration');
+preview.el('celebrate').onclick();assert.ok(previewAudio.nodes.every(n=>n.disconnected));
+
+const noAudio=boot({audioContext:class{constructor(){throw Error('Unavailable')}}});
+assert.doesNotThrow(()=>noAudio.el('preview-celebration').onclick());assert.equal(noAudio.el('celebration').hidden,false);
+const failedSpeechAudio=audioHarness(),failedSpeech=boot({audioContext:failedSpeechAudio.AudioContext}),failedWords=attachSpeech(failedSpeech);
+for(let i=0;i<10;i++)revealIndex(failedSpeech,i);
+failedWords.at(-1).onerror({error:'voice-unavailable'});assert.equal(failedSpeechAudio.nodes.length,4);
+failedWords.at(-1).onend();assert.equal(failedSpeechAudio.nodes.length,4);
+const interruptedAudio=audioHarness(),interrupted=boot({audioContext:interruptedAudio.AudioContext}),interruptedWords=attachSpeech(interrupted);
+for(let i=0;i<10;i++)revealIndex(interrupted,i);
+interruptedWords.at(-1).onerror({error:'interrupted'});interruptedWords.at(-1).onend();assert.equal(interruptedAudio.nodes.length,0);
+const mutedAudio=audioHarness(),muted=boot({audioContext:mutedAudio.AudioContext,storage:memoryStorage({[storageKey]:JSON.stringify({version:1,celebrationDefaultsVersion:2,celebrationEnabled:true,celebrationSoundEnabled:false})})});
+for(let i=0;i<10;i++)revealIndex(muted,i);
+assert.equal(muted.el('celebration').hidden,false);assert.equal(mutedAudio.contexts.length,0);
+const cleanupAudio=audioHarness(),cleanupParty=boot({audioContext:cleanupAudio.AudioContext});
+cleanupParty.el('preview-celebration').onclick();[...cleanupParty.timers.values()].find(t=>t.ms===3600).fn();
+assert.equal(cleanupParty.el('confetti').innerHTML,'');assert.ok(cleanupAudio.nodes.every(n=>n.disconnected));
+
+(async()=>{
+ for(const action of ['play','navigate','mute','hide','sync','reject']){
+  const audio=audioHarness('suspended'),app=boot({audioContext:audio.AudioContext});
+  app.el('preview-celebration').onclick();assert.equal(audio.resumeCalls,1);assert.equal(audio.nodes.length,0);
+  if(action==='navigate')app.el('next').onclick();
+  if(action==='mute')app.el('celebration-sound').onclick();
+  if(action==='hide'){app.context.document.hidden=true;app.handlers.visibilitychange();}
+  if(action==='sync')app.handlers.storage({key:storageKey,newValue:null});
+  if(action==='reject')audio.reject();else audio.resolve();
+  await Promise.resolve();await Promise.resolve();
+  assert.equal(audio.nodes.length,action==='play'?4:0,action);
+ }
+ console.log('Reward audio passed: default migration, saved mute/off, 180 particles, preview without progress, pronunciation priority, cancellation, volume envelope, background tabs, delayed/blocked audio and API fallback.');
+})().catch(error=>{console.error(error);process.exitCode=1});
