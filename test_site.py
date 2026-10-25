@@ -38,21 +38,29 @@ class SiteTests(unittest.TestCase):
 
     def test_vocabulary_and_categories(self):
         cards=self.data['cards']
-        self.assertEqual(len(cards),117)
-        self.assertEqual(len({c['word'] for c in cards}),117)
-        self.assertEqual(sum(c['kind']=='pair' for c in cards),38)
+        self.assertEqual(len(cards),141)
+        self.assertEqual(len({c['word'] for c in cards}),141)
+        self.assertEqual(sum(c['kind']=='pair' for c in cards),50)
         for card in cards:
             self.assertEqual(card['a']+card['b'],card['word'].replace(' ',''))
             self.assertEqual(card['kind']=='pair',' ' in card['word'])
 
     def test_all_art_is_available_and_valid(self):
-        self.assertEqual(len(self.data['art']),261)
+        self.assertEqual(len(self.data['art']),304)
         for card in self.data['cards']:
             for word in (card['a'],card['b'],card['word']):
                 root=ET.fromstring(self.data['art'][word])
                 self.assertEqual(root.get('aria-label'),word)
                 self.assertTrue(root.tag.endswith('svg'))
         self.assertEqual(ET.fromstring(self.data['art']['pot@flower']).get('aria-label'),'pot')
+        self.assertEqual(ET.fromstring(self.data['art']['shell@egg']).get('aria-label'),'shell')
+        cards={c['word']:c for c in self.data['cards']}
+        self.assertEqual(cards['eggshell']['b_art'],'shell@egg')
+        self.assertNotIn('b_art',cards['seashell'])
+        for card in self.data['cards']:
+            for side in ('a','b'):
+                key=card.get(side+'_art',card[side])
+                self.assertEqual(ET.fromstring(self.data['art'][key]).get('aria-label'),card[side])
 
     def test_chinese_help_is_complete_and_documented(self):
         for card in self.data['cards']:
@@ -158,7 +166,7 @@ class SiteTests(unittest.TestCase):
         self.assertIn('<option id="sort-shuffle" value="shuffle">随机顺序</option>',self.html)
         self.assertEqual(self.data['ui']['en']['random'],'Shuffle')
         self.assertEqual(self.data['ui']['en']['shuffle'],'Shuffled order')
-        for filename,terms in [('README.md',('different order from the previous one','117 groups','Reloading preserves the order and position')),('README.zh-CN.md',('与上一次不同的顺序','117 组','刷新后保留顺序和位置'))]:
+        for filename,terms in [('README.md',('different order from the previous one','141 groups','Reloading preserves the order and position')),('README.zh-CN.md',('与上一次不同的顺序','141 组','刷新后保留顺序和位置'))]:
             doc=(ROOT/filename).read_text()
             for text in terms:self.assertIn(text,doc)
         for filename in ('README.md','README.zh-CN.md'):

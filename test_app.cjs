@@ -23,21 +23,21 @@ const ids=app=>JSON.parse(app.run('JSON.stringify(deck.map(c=>c.id))'));
 const filterKeys=[...html.matchAll(/data-filter="([^"]+)"/g)].map(m=>m[1]);
 assert.deepEqual(filterKeys,['all','compound','pair']);
 const {context,el,handlers,filters,run}=boot();
-assert.equal(run('deck.length'),117);assert.equal(el('prev').disabled,true);assert.match(el('cards').innerHTML,/snow/);
-assert.equal(el('meta').textContent,'1 / 117');
+assert.equal(run('deck.length'),141);assert.equal(el('prev').disabled,true);assert.match(el('cards').innerHTML,/snow/);
+assert.equal(el('meta').textContent,'1 / 141');
 assert.doesNotMatch(html,/慢读|data-slow|点图片或单词，听一听|读一读，然后合起来/);
 assert.match(html,/<details class="help"><summary id="help-summary">玩法说明<\/summary>/);
 const compoundIds=run("chooseDeck('compound').map(c=>c.id)");
 const pairIds=run("chooseDeck('pair').map(c=>c.id)");
-assert.equal(compoundIds.length+pairIds.length,117);
+assert.equal(compoundIds.length+pairIds.length,141);
 assert.equal(compoundIds.some(id=>pairIds.includes(id)),false);
 assert.equal(run("ALL.filter(c=>c.id>=75&&c.id<105).every(c=>chooseDeck('pair').some(p=>p.id===c.id))"),true);
-assert.equal(el('compound-count').textContent,79);assert.equal(el('pair-count').textContent,38);
+assert.equal(el('compound-count').textContent,91);assert.equal(el('pair-count').textContent,50);
 assert.equal(run('ALL[0].word'),'snowman');
 assert.equal(run("ALL.findIndex(c=>c.word==='raincoat')<ALL.findIndex(c=>c.word==='butterfly')"),true);
 assert.equal(run("ALL.at(-1).word"),'hot dog');
 // Read the visible colored text, not aria-labels, and check actual spelling.
-for(let i=0;i<117;i++){
+for(let i=0;i<141;i++){
   run(`position=${i};revealed=false;render()`);
   const card=run('deck[position]');
   const visibleWords=()=>[...el('cards').innerHTML.matchAll(/<span class="word [^"]*" lang="en">(.*?)<\/span><\/button>/g)].map(m=>m[1].replace(/<[^>]+>/g,''));
@@ -49,17 +49,17 @@ for(let i=0;i<117;i++){
   assert.deepEqual(visibleWords(),[card.word]);
   assert.ok(el('cards').innerHTML.includes(`data-say="${card.word}"`));
   assert.equal((el('cards').innerHTML.match(/class="listen"/g)||[]).length,1);
-  assert.equal(el('meta').textContent,`${i+1} / 117`);
+  assert.equal(el('meta').textContent,`${i+1} / 141`);
 }
 run("setFilter('all')");
 run('renderLibrary()');assert.doesNotMatch(el('library').innerHTML,/新增/);
 el('reveal').onclick();assert.equal(run('revealed'),true);assert.match(el('cards').innerHTML,/snowman/);
 assert.equal(el('toast').textContent,''); // Unsupported auto-read stays quiet.
-run("setFilter('pair')");assert.equal(run('deck.length'),38);assert.equal(run('revealed'),false);assert.equal(run('deck[0].word'),'toy car');el('reveal').onclick();assert.match(el('cards').innerHTML,/toy car/);
-run("setFilter('pair')");assert.equal(run('deck.length'),38);run('move(999)');assert.equal(el('next').disabled,true);run('move(-999)');assert.equal(el('prev').disabled,true);
+run("setFilter('pair')");assert.equal(run('deck.length'),50);assert.equal(run('revealed'),false);assert.equal(run('deck[0].word'),'toy car');el('reveal').onclick();assert.match(el('cards').innerHTML,/toy car/);
+run("setFilter('pair')");assert.equal(run('deck.length'),50);run('move(999)');assert.equal(el('next').disabled,true);run('move(-999)');assert.equal(el('prev').disabled,true);
 el('search').value='bottle';run('renderLibrary()');assert.match(el('library').innerHTML,/water bottle/);
 el('search').value='zzzz';run('renderLibrary()');assert.match(el('library').innerHTML,/没有找到/);
-run("setFilter('compound')");assert.equal(run('deck.length'),79);assert.equal(run("deck.some(c=>c.word.includes(' '))"),false);
+run("setFilter('compound')");assert.equal(run('deck.length'),91);assert.equal(run("deck.some(c=>c.word.includes(' '))"),false);
 console.log('Interactive state checks passed: reveal, reset, 3 filters, bounds, search and no matches.');
 run("setFilter('all');position=deck.findIndex(c=>c.word==='flower pot');revealed=false;render()");
 assert.ok(el('cards').innerHTML.includes(run("DATA.art['pot@flower']")));
@@ -87,13 +87,13 @@ assert.equal(run('revealed'),false);
 assert.match(el('cards').innerHTML,/snow/);
 assert.match(el('cards').innerHTML,/man/);
 assert.doesNotMatch(el('cards').innerHTML,/snowman/);
-for(let i=0;i<117;i++){
+for(let i=0;i<141;i++){
   assert.equal(run('position'),i);
   el('reveal').onclick();
   assert.equal(run('revealed'),true);
-  assert.equal(el('reveal').textContent,i===116?'再玩一遍':'下一组 →');
+  assert.equal(el('reveal').textContent,i===140?'再玩一遍':'下一组 →');
   el('reveal').onclick();
-  assert.equal(run('position'),(i+1)%117);
+  assert.equal(run('position'),(i+1)%141);
   assert.equal(run('revealed'),false);
   assert.equal(el('split').hidden,true);
 }
@@ -129,7 +129,7 @@ const reshuffling=boot();
 for(let i=0;i<40;i++){
   const old=ids(reshuffling);reshuffling.el('random').onclick();
   assert.notDeepEqual(ids(reshuffling),old);
-  assert.deepEqual(ids(reshuffling).slice().sort((a,b)=>a-b),Array.from({length:117},(_,n)=>n));
+  assert.deepEqual(ids(reshuffling).slice().sort((a,b)=>a-b),Array.from({length:141},(_,n)=>n));
   assert.equal(reshuffling.run('position'),0);assert.equal(reshuffling.run('revealed'),false);
   assert.equal(reshuffling.el('sort-order').value,'shuffle');
 }
@@ -174,7 +174,7 @@ assert.doesNotThrow(()=>run("say('test')"));assert.match(el('toast').textContent
 delete context.window.speechSynthesis;delete context.window.SpeechSynthesisUtterance;
 run("say('blue')");assert.match(el('toast').textContent,/不支持朗读/);
 console.log('Search selection, focus, modal shortcuts, repeated Space, random and speech error checks passed.');
-console.log('All 117 colored word joins, one listening control per card, concise progress and reveal-only auto-read passed.');
+console.log('All 141 colored word joins, one listening control per card, concise progress and reveal-only auto-read passed.');
 
 // The collapsed help remains keyboard-accessible when search has no results.
 run('openLibrary()');el('search').value='zzzz';el('search').oninput();
@@ -213,7 +213,7 @@ assert.equal(savedStore.writes.length,writesBeforeReload);
 assert.equal(reloaded.run('deck[position].id'),resumeId);assert.equal(reloaded.run('revealed'),false);
 assert.equal(reloaded.run('autoRead'),false);assert.equal(reloaded.run('completed.size'),1);
 assert.equal(reloaded.el('review-card').attributes['aria-pressed'],'true');
-assert.equal(reloaded.el('learning-status').textContent,'已揭晓 1 / 117');
+assert.equal(reloaded.el('learning-status').textContent,'已揭晓 1 / 141');
 const reorderedData=JSON.parse(payload);reorderedData.cards.reverse();
 const reordered=boot({storage:savedStore,data:JSON.stringify(reorderedData)});
 assert.equal(reordered.run('deck[position].id'),resumeId); // IDs survive editorial sorting.
@@ -223,7 +223,7 @@ assert.notEqual(reordered.run('position'),reloaded.run('position'));
 reloaded.run("setFilter('pair')");const pairId=reloaded.run('deck[position].id');
 reloaded.el('review-card').onclick();reloaded.el('review-only').onclick();
 assert.equal(reloaded.run('reviewOnly'),true);assert.equal(reloaded.run('deck.length'),2);
-assert.equal(reloaded.el('compound-count').textContent,79);assert.equal(reloaded.el('pair-count').textContent,38);
+assert.equal(reloaded.el('compound-count').textContent,91);assert.equal(reloaded.el('pair-count').textContent,50);
 reloaded.run("setFilter('pair')");
 assert.equal(reloaded.run('deck.length'),1);assert.equal(reloaded.run('deck[0].id'),pairId);
 assert.equal(reloaded.el('random').disabled,true);
@@ -241,17 +241,17 @@ reviewReload.run("setFilter('compound')");assert.equal(reviewReload.run('deck[0]
 reviewReload.el('review-card').onclick();assert.equal(reviewReload.run('review.size'),0);
 reviewReload.run('openLibrary()');assert.match(reviewReload.el('library').innerHTML,/snowman/);
 reviewReload.el('library').onclick({target:{closest:()=>({dataset:{id:String(pairId)}})}});
-assert.equal(reviewReload.run('reviewOnly'),false);assert.equal(reviewReload.run('deck.length'),117);
+assert.equal(reviewReload.run('reviewOnly'),false);assert.equal(reviewReload.run('deck.length'),141);
 assert.equal(reviewReload.run('deck[position].id'),pairId);
 reviewReload.el('review-only').onclick();assert.equal(reviewReload.run('deck.length'),0);
-reviewReload.el('review-only').onclick();assert.equal(reviewReload.run('deck.length'),117);
+reviewReload.el('review-only').onclick();assert.equal(reviewReload.run('deck.length'),141);
 
 // One shuffle changes the complete order; Next group then visits every card
 // exactly once, including across reloads, without reshuffling on render.
 const shuffleStore=memoryStorage();let shuffle=boot({storage:shuffleStore});
 shuffle.el('random').onclick();const shuffledSequence=ids(shuffle);
 const visited=[];
-for(let i=0;i<117;i++){
+for(let i=0;i<141;i++){
   if(i===41)shuffle=boot({storage:shuffleStore});
   assert.deepEqual(ids(shuffle),shuffledSequence);
   visited.push(shuffle.run('deck[position].id'));
@@ -259,21 +259,21 @@ for(let i=0;i<117;i++){
   assert.equal(shuffle.run('revealed'),true);
   shuffle.el('reveal').onclick();
 }
-assert.deepEqual(visited,shuffledSequence);assert.equal(new Set(visited).size,117);
-assert.equal(shuffle.run('completed.size'),117);assert.equal(shuffle.run('position'),0);
+assert.deepEqual(visited,shuffledSequence);assert.equal(new Set(visited).size,141);
+assert.equal(shuffle.run('completed.size'),141);assert.equal(shuffle.run('position'),0);
 const stableWrites=shuffleStore.writes.length;
 shuffle.run('render();renderLibrary()');assert.deepEqual(ids(shuffle),shuffledSequence);
 assert.equal(shuffleStore.writes.length,stableWrites);
 shuffle.run("setLanguage('en')");assert.deepEqual(ids(shuffle),shuffledSequence);
 shuffle.el('random').onclick();assert.notDeepEqual(ids(shuffle),shuffledSequence);
-assert.equal(shuffle.run('completed.size'),117);assert.equal(shuffle.run('revealed'),false);
+assert.equal(shuffle.run('completed.size'),141);assert.equal(shuffle.run('revealed'),false);
 // Category and search views keep the relative order of the same permutation.
 const allShuffled=ids(shuffle);
 shuffle.run("setFilter('pair')");const pairSequence=ids(shuffle);
 assert.deepEqual(pairSequence,allShuffled.filter(id=>shuffle.run(`ALL.find(c=>c.id===${id}).kind==='pair'`)));
-assert.equal(pairSequence.length,38);
+assert.equal(pairSequence.length,50);
 shuffle.el('random').onclick();assert.notDeepEqual(ids(shuffle),pairSequence);
-assert.equal(new Set(ids(shuffle)).size,38);assert.equal(shuffle.run("deck.every(c=>c.kind==='pair')"),true);
+assert.equal(new Set(ids(shuffle)).size,50);assert.equal(shuffle.run("deck.every(c=>c.kind==='pair')"),true);
 shuffle.run("setFilter('all');openLibrary()");
 assert.deepEqual([...shuffle.el('library').innerHTML.matchAll(/data-id="(\d+)"/g)].map(m=>Number(m[1])),ids(shuffle));
 shuffle.el('search').value='snow';shuffle.el('search').oninput();
@@ -305,13 +305,13 @@ assert.equal(twoCards.el('sort-order').value,'az');assert.equal(twoCards.storage
 twoCards.run('toggleReview()');smallWrites=twoCards.storage.writes.length;twoCards.run('shuffleDeck()');
 assert.equal(twoCards.run('deck.length'),0);assert.equal(twoCards.storage.writes.length,smallWrites);
 // Missing, duplicate, unknown, string or incomplete order IDs safely fall back.
-for(const badOrder of [null,[],[0,1],Array(117).fill(0),Array.from({length:117},(_,i)=>String(i)),Array.from({length:117},(_,i)=>i+1)]){
+for(const badOrder of [null,[],[0,1],Array(141).fill(0),Array.from({length:141},(_,i)=>String(i)),Array.from({length:141},(_,i)=>i+1)]){
   const corruptShuffle=memoryStorage({[storageKey]:JSON.stringify({version:1,sortOrder:'shuffle',shuffleIds:badOrder,currentId:resumeId,completed:[resumeId],review:[resumeId]})});
   const safe=boot({storage:corruptShuffle});assert.equal(safe.run('sortOrder'),'recommended');
   assert.equal(safe.run('deck[position].id'),resumeId);assert.equal(safe.run('completed.size'),1);assert.equal(safe.run('review.size'),1);
   assert.equal(corruptShuffle.writes.length,0);
 }
-console.log('Shuffle order passed: 117 unique groups, changed permutations, next/restart, reload, filters/search/review, two-card fallback, single/empty lists, corrupt records and cross-tab stability.');
+console.log('Shuffle order passed: 141 unique groups, changed permutations, next/restart, reload, filters/search/review, two-card fallback, single/empty lists, corrupt records and cross-tab stability.');
 
 // Malformed, old or unavailable storage must not break playing or overwrite
 // an unsupported future schema. Only known numeric IDs can be restored.
@@ -479,7 +479,7 @@ assert.doesNotMatch(langApp.el('library').innerHTML,/[\u4e00-\u9fff]/);
 langApp.run('closeLibrary()');
 // Every card, note, action, status and library result in English is free of Chinese UI copy.
 const english=boot({url:'https://example.test/?lang=en'});
-for(let i=0;i<117;i++){
+for(let i=0;i<141;i++){
   english.run(`position=${i};revealed=false;render()`);
   assert.doesNotMatch(english.el('cards').innerHTML,/[\u4e00-\u9fff]/);
   assert.doesNotMatch(english.el('word-help-content').innerHTML,/[\u4e00-\u9fff]/);
@@ -610,3 +610,35 @@ const sessionParty=boot({storage:{getItem(){throw Error('Blocked')},setItem(){th
 assert.doesNotThrow(()=>{sessionParty.el('celebrate').onclick();for(let i=0;i<10;i++)revealIndex(sessionParty,i)});
 assert.equal(sessionParty.el('celebration').hidden,false);
 console.log('Celebrations passed: default off, distinct groups, repeat prevention, each ten, timers, focus, bilingual copy, persistence, reduced motion, cross-tab reads, legacy/corrupt/blocked storage.');
+
+// New groups must be additions, with stable IDs and all component artwork.
+const additions=boot();
+const expectedAdditions=['sandbox','dollhouse','birdcage','doormat','sunglasses','paintbrush','tablecloth','meatball','houseboat','handbag','eggshell','flagpole','toy train','toy robot','dog bed','dog bowl','cat food','milk bottle','chocolate milk','snow boots','jump rope','pumpkin pie','birthday cake','bike helmet'];
+assert.deepEqual(JSON.parse(additions.run('JSON.stringify(ALL.filter(c=>c.id>=117).sort((a,b)=>a.id-b.id).map(c=>c.word))')),expectedAdditions);
+assert.equal(additions.run('ALL.filter(c=>c.id>=117&&c.kind==="compound").length'),12);
+assert.equal(additions.run('ALL.filter(c=>c.id>=117&&c.kind==="pair").length'),12);
+additions.run("position=deck.findIndex(c=>c.word==='eggshell');render()");
+assert.ok(additions.el('cards').innerHTML.includes(additions.run("DATA.art['shell@egg']")));
+assert.ok(!additions.el('cards').innerHTML.includes(additions.run('DATA.art.shell')));
+additions.run('primaryAction()');assert.match(additions.el('cards').innerHTML,/eggshell/);
+additions.run("position=deck.findIndex(c=>c.word==='seashell');revealed=false;render()");
+assert.ok(additions.el('cards').innerHTML.includes(additions.run('DATA.art.shell')));
+additions.el('search').value='头盔';additions.run('renderLibrary()');assert.match(additions.el('library').innerHTML,/bike helmet/);
+const legacyOrder=Array.from({length:117},(_,i)=>116-i);
+const legacyStore=memoryStorage({[storageKey]:JSON.stringify({version:1,sortOrder:'shuffle',shuffleIds:legacyOrder,currentId:110,completed:[4,110],review:[110],autoRead:false,celebrationEnabled:true,celebrationBatch:[0,1,2,3,4,5,6,7,8],lastCelebrationCard:8})});
+const migrated=boot({storage:legacyStore});
+assert.equal(migrated.run('sortOrder'),'shuffle');assert.equal(migrated.run('deck.length'),141);
+assert.deepEqual(ids(migrated).slice(0,117),legacyOrder);
+assert.deepEqual(ids(migrated).slice(117).sort((a,b)=>a-b),Array.from({length:24},(_,i)=>117+i));
+assert.equal(migrated.run('deck[position].id'),110);assert.equal(migrated.run('completed.size'),2);
+assert.equal(migrated.run('review.has(110)'),true);assert.equal(migrated.run('autoRead'),false);
+assert.equal(migrated.run('celebrationBatch.size'),9);assert.equal(legacyStore.writes.length,0);
+migrated.el('next').onclick();assert.equal(migrated.run('deck[position].id'),109);
+assert.equal(JSON.parse(legacyStore.getItem(storageKey)).shuffleIds.length,141);
+migrated.run('position=deck.findIndex(c=>c.id===117);revealed=false;primaryAction()');
+assert.equal(migrated.el('celebration').hidden,false);
+for(const invalid of [legacyOrder.slice(1),legacyOrder.map((id,i)=>i===0?115:id)]){
+ const incomplete=boot({storage:memoryStorage({[storageKey]:JSON.stringify({version:1,sortOrder:'shuffle',shuffleIds:invalid})})});
+ assert.equal(incomplete.run('sortOrder'),'recommended');
+}
+console.log('24 additions passed: exact stable IDs, counts, shell context, Chinese search and 117-card progress/shuffle/celebration migration.');

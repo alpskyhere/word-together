@@ -2,7 +2,7 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-A picture-card word game for children and families. Explore **117 word groups**: 79 written as one word and 38 written as two words.
+A picture-card word game for children and families. Explore **141 word groups**: 91 written as one word and 50 written as two words.
 
 `snow + man → snowman` · `toy + car → toy car`
 
@@ -34,7 +34,7 @@ Choose **All / One word / Two words**. Sort by **Suggested order**, **Alphabetic
 
 Changing the sort starts at the first group in the current selection and preserves learning records. The chooser and practice list follow the same sort.
 
-Each click on **Shuffle** creates a different order from the previous one and starts at the first group. **All** includes all 117 groups; a category or practice list shows only its matching groups. **Next group** follows the new order without repeats in a complete pass. Reloading preserves the order and position. With fewer than two groups, shuffling is unavailable.
+Each click on **Shuffle** creates a different order from the previous one and starts at the first group. **All** includes all 141 groups; a category or practice list shows only its matching groups. **Next group** follows the new order without repeats in a complete pass. Reloading preserves the order and position. When updating from the 117-group edition, existing learning records and the saved shuffled order are kept, with new groups appended. With fewer than two groups, shuffling is unavailable.
 
 ## Progress and offline use
 
@@ -57,4 +57,4 @@ python3 test_site.py
 node test_app.cjs
 ```
 
-Updated (California time): **10/25/2026 12:43 PDT (UTC-07:00)** · [Release information](release.json)
+Updated (California time): **10/25/2026 13:36 PDT (UTC-07:00)** · [Release information](release.json)
