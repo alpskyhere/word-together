@@ -5,15 +5,17 @@ function memoryStorage(initial={}){
   const values=new Map(Object.entries(initial)),writes=[];
   return {values,writes,getItem(key){return values.get(key)??null},setItem(key,value){writes.push(key);values.set(key,value)}};
 }
-function boot({storage=memoryStorage(),data=payload}={}){
+function boot({storage=memoryStorage(),data=payload,url='https://example.test/?lang=zh',languages=['zh-CN']}={}){
   const elements=new Map();
   function el(id){if(!elements.has(id))elements.set(id,{id,style:{},dataset:{},attributes:{},textContent:'',innerHTML:'',value:'',hidden:id==='overlay',setAttribute(k,v){this.attributes[k]=String(v)},focus(){context.document.activeElement=this;},querySelectorAll(){return[]}});return elements.get(id)}
   el('word-data').textContent=data;
   const filters=filterKeys.map(k=>{let e=el('filter-'+k);e.dataset.filter=k;return e});
   const handlers={};
-  const context=vm.createContext({document:{getElementById:el,querySelector:()=>el('progressbar'),querySelectorAll:()=>filters,addEventListener(type,fn){handlers[type]=fn}},window:{localStorage:storage,addEventListener(type,fn){handlers[type]=fn}},setTimeout:()=>0,clearTimeout(){},console,Math});
+  const location=new URL(url),historyWrites=[];
+  const history={replaceState(_state,_title,next){historyWrites.push(next);location.href=next;}};
+  const context=vm.createContext({document:{documentElement:el('document-root'),title:'',getElementById:el,querySelector:()=>el('progressbar'),querySelectorAll:()=>filters,addEventListener(type,fn){handlers[type]=fn}},window:{localStorage:storage,location,history,navigator:{languages,language:languages[0]},addEventListener(type,fn){handlers[type]=fn}},setTimeout:()=>0,clearTimeout(){},console,Math,URL,URLSearchParams});
   vm.runInContext(source,context);
-  return {context,el,handlers,filters,storage,run:s=>vm.runInContext(s,context)};
+  return {context,el,handlers,filters,storage,location,historyWrites,run:s=>vm.runInContext(s,context)};
 }
 const filterKeys=[...html.matchAll(/data-filter="([^"]+)"/g)].map(m=>m[1]);
 assert.deepEqual(filterKeys,['all','compound','pair']);
@@ -21,7 +23,7 @@ const {context,el,handlers,filters,run}=boot();
 assert.equal(run('deck.length'),117);assert.equal(el('prev').disabled,true);assert.match(el('cards').innerHTML,/snow/);
 assert.equal(el('meta').textContent,'1 / 117');
 assert.doesNotMatch(html,/慢读|data-slow|点图片或单词，听一听|读一读，然后合起来/);
-assert.match(html,/<details class="help"><summary>玩法说明<\/summary>/);
+assert.match(html,/<details class="help"><summary id="help-summary">玩法说明<\/summary>/);
 const compoundIds=run("chooseDeck('compound').map(c=>c.id)");
 const pairIds=run("chooseDeck('pair').map(c=>c.id)");
 assert.equal(compoundIds.length+pairIds.length,117);
@@ -291,10 +293,10 @@ right.handlers.storage({key:storageKey,newValue:null});assert.equal(right.run('c
 console.log('Persistence passed: reload, stable IDs, unique revealed counts, review/empty states, nonrepeating cycles, malformed data, storage failures and cross-tab events.');
 
 // Sort controls, exact alphabetic/length ordering and filter/review composition.
-assert.match(html,/<button data-filter="compound" aria-pressed="false">连着写 <span id="compound-count"><\/span><\/button>/);
-assert.match(html,/<button data-filter="pair" aria-pressed="false">分开写 <span id="pair-count"><\/span><\/button>/);
+assert.match(html,/<button data-filter="compound" aria-pressed="false"><span id="category-compound">连着写<\/span> <span id="compound-count"><\/span><\/button>/);
+assert.match(html,/<button data-filter="pair" aria-pressed="false"><span id="category-pair">分开写<\/span> <span id="pair-count"><\/span><\/button>/);
 assert.doesNotMatch(html,/合成一个词|保留两个词/);
-assert.deepEqual([...html.matchAll(/<option value="([^"]+)">/g)].map(m=>m[1]),['recommended','az','za','short']);
+assert.deepEqual([...html.matchAll(/<option id="[^"]+" value="([^"]+)">/g)].map(m=>m[1]),['recommended','az','za','short']);
 const sortedStore=memoryStorage(),sorting=boot({storage:sortedStore});
 const baseCards=JSON.parse(payload).cards;
 const spellingOf=c=>c.word.replace(/\s/g,'');
@@ -336,61 +338,116 @@ localSort.handlers.storage({key:storageKey,newValue:JSON.stringify({version:1,so
 assert.equal(localSort.run('sortOrder'),'az');assert.equal(localSort.run('deck[position].id'),localSortId);
 console.log('Sorting passed: A–Z, Z–A, length, reset, search, filters, review, persistence, old records and cross-tab stability.');
 
-// Chinese hints explain the whole deck without changing learning progress.
+// Word notes use the chosen interface language; learning words stay English.
 const chinese=boot(),hintWrites=chinese.storage.writes.length;
-assert.match(html,/<details id="word-help" class="word-help" hidden><summary>中文提示<\/summary>/);
-assert.equal(chinese.el('word-help').hidden,false);
-assert.equal(chinese.el('word-help').open,false);
-assert.match(chinese.el('word-help-content').innerHTML,/雪人/);
+assert.match(html,/<summary id="word-help-summary">词语提示<\/summary>/);
+assert.equal(chinese.el('word-help').hidden,true);
 assert.doesNotMatch(chinese.el('cards').innerHTML,/雪人|组合后/);
+chinese.run("position=deck.findIndex(c=>c.word==='rubber duck');render()");
+assert.equal(chinese.el('word-help').hidden,false);assert.equal(chinese.el('word-help').open,false);
+assert.match(chinese.el('word-help-content').innerHTML,/rubber 在这里指橡胶/);
 chinese.el('word-help').open=true;
 chinese.handlers.keydown({key:' ',code:'Space',target:{tagName:'SUMMARY',matches:s=>s.split(',').includes('summary')},preventDefault(){throw Error('Native help expansion intercepted')}});
 assert.equal(chinese.run('revealed'),false);assert.equal(chinese.storage.writes.length,hintWrites);
 chinese.el('reveal').onclick();assert.equal(chinese.el('word-help').open,true);
 chinese.el('split').onclick();assert.equal(chinese.el('word-help').open,true);
 chinese.run('move(1)');assert.equal(chinese.el('word-help').open,false);
-assert.doesNotMatch(chinese.el('word-help-content').innerHTML,/雪人/);
-chinese.run('move(-1)');assert.equal(chinese.el('word-help').open,false);
+assert.doesNotMatch(chinese.el('word-help-content').innerHTML,/橡胶/);
 for(const card of JSON.parse(payload).cards){
   chinese.run(`position=deck.findIndex(c=>c.id===${card.id});render()`);
   const content=chinese.el('word-help-content').innerHTML;
-  for(const key of ['a','b','word'])assert.ok(content.includes(card.zh[key]),`${card.word} missing ${key} meaning`);
-  if(card.zh.note)assert.ok(content.includes(card.zh.note));
-  assert.equal(chinese.el('word-help').hidden,false);
+  assert.equal(chinese.el('word-help').hidden,!card.zh.note);
+  if(card.zh.note)assert.ok(content.includes(card.zh.note));else assert.equal(content,'');
   assert.equal(chinese.el('word-help').open,false);
 }
-chinese.run("position=deck.findIndex(c=>c.word==='rubber duck');render()");
-assert.match(chinese.el('word-help-content').innerHTML,/rubber 在这里指橡胶/);
-chinese.run("position=deck.findIndex(c=>c.word==='snowman');render()");
-assert.doesNotMatch(chinese.el('word-help-content').innerHTML,/橡胶/);
 chinese.run('toggleReviewOnly()');
 assert.equal(chinese.run('deck.length'),0);assert.equal(chinese.el('word-help').hidden,true);
-assert.equal(chinese.el('word-help').open,false);assert.equal(chinese.el('word-help-content').innerHTML,'');
-// Search recognizes Chinese meanings, English spelling, and context-specific senses.
+assert.equal(chinese.el('word-help-content').innerHTML,'');
 const searching=boot();searching.run('openLibrary()');
 for(const [query,word] of [['雪人','snowman'],['热狗','hot dog'],['橡胶','rubber duck'],['盆','flower pot'],[' SNOWMAN ','snowman']]){
   searching.el('search').value=query;searching.el('search').oninput();
   const matches=[...searching.el('library').innerHTML.matchAll(/data-id="(\d+)"/g)].map(m=>Number(m[1]));
-  const expectedId=baseCards.find(c=>c.word===word).id;
-  assert.ok(matches.includes(expectedId),`${query} did not find ${word}`);
+  assert.ok(matches.includes(baseCards.find(c=>c.word===word).id));
+  assert.doesNotMatch(searching.el('library').innerHTML,/entry-meaning/);
 }
-searching.el('search').value='雪人';searching.el('search').oninput();
-assert.match(searching.el('library').innerHTML,/<small class="entry-meaning">雪人<\/small>/);
-assert.equal((searching.el('library').innerHTML.match(/class="entry /g)||[]).length,1);
-const beforeChineseSelection=searching.storage.writes.length;
-searching.el('library').onclick({target:{closest:()=>({dataset:{id:'4'}})}});
-assert.equal(searching.run('deck[position].word'),'snowman');
-assert.equal(searching.el('word-help').open,false);
-assert.equal(searching.storage.writes.length,beforeChineseSelection+1);
 const searchWrites=searching.storage.writes.length;
-searching.run('openLibrary()');searching.el('search').value='找不到的词';searching.el('search').oninput();
+searching.el('search').value='找不到的词';searching.el('search').oninput();
 assert.match(searching.el('library').innerHTML,/没有找到/);
 assert.equal(searching.storage.writes.length,searchWrites);
-// Escape all help and search-result text, even if future vocabulary contains markup.
-const injected=JSON.parse(payload);injected.cards[0].zh={a:'<img src=x onerror=alert(1)>',b:'a&b',word:'<script>alert(1)</script>',note:'<b>unsafe</b>'};
+const injected=JSON.parse(payload);injected.cards[0].zh.note='<img src=x onerror=alert(1)>';injected.cards[0].note_en='<script>alert(1)</script>';
 const safeHints=boot({data:JSON.stringify(injected)});
-assert.doesNotMatch(safeHints.el('word-help-content').innerHTML,/<img|<script|<b>/);
-assert.match(safeHints.el('word-help-content').innerHTML,/&lt;img/);
-safeHints.run('openLibrary()');
-assert.doesNotMatch(safeHints.el('library').innerHTML,/<script>/);
-console.log('Chinese support passed: all 117 meanings, contextual notes, collapsed defaults, reveal/split, card changes, keyboard, empty review, bilingual search, selection, no hint/search storage writes, and escaped text.');
+assert.doesNotMatch(safeHints.el('word-help-content').innerHTML,/<img/);
+safeHints.run("setLanguage('en')");assert.doesNotMatch(safeHints.el('word-help-content').innerHTML,/<script>/);
+console.log('Word notes passed: bilingual explanations, English learning words, collapsed defaults, card changes, keyboard, empty review, bilingual search and escaped text.');
+
+// Language selection: explicit URL > saved choice > supported browser language > English.
+const languageKey='word-together:language:v1';
+for(const [url,saved,languages,expected] of [
+  ['?lang=en','zh',['zh-CN'],'en'],['?lang=zh','en',['en-US'],'zh'],
+  ['', 'en',['zh-CN'],'en'],['',null,['zh-TW','en-US'],'zh'],
+  ['',null,['fr-FR','en-US'],'en'],['?lang=xx','bad',['fr'],'en'],
+  ['?lang=zh-CN',null,['en-US'],'en']
+]){
+  const storage=memoryStorage(saved?{[languageKey]:saved}:{});
+  const app=boot({url:'https://example.test/'+url,storage,languages});
+  assert.equal(app.run('locale'),expected);
+  assert.equal(app.context.document.documentElement.lang,expected==='zh'?'zh-CN':'en');
+  assert.equal(storage.writes.length,0);assert.equal(app.historyWrites.length,0);
+}
+const languageStore=memoryStorage(),langApp=boot({storage:languageStore,url:'https://example.test/'});
+langApp.run("setSort('az');position=deck.findIndex(c=>c.word==='rubber duck');render();primaryAction();toggleReview()");
+langApp.el('word-help').open=true;
+const stateBefore=langApp.run('JSON.stringify({position,sortOrder,filter,revealed,autoRead,review:[...review],completed:[...completed],drawn:[...drawn]})');
+const progressBefore=languageStore.getItem(storageKey),writesBeforeLanguage=languageStore.writes.length;
+langApp.el('language-en').onclick({preventDefault(){}});
+assert.equal(langApp.run('locale'),'en');assert.equal(languageStore.getItem(languageKey),'en');
+assert.equal(languageStore.getItem(storageKey),progressBefore);
+assert.deepEqual(languageStore.writes.slice(writesBeforeLanguage),[languageKey]);
+assert.equal(langApp.run('JSON.stringify({position,sortOrder,filter,revealed,autoRead,review:[...review],completed:[...completed],drawn:[...drawn]})'),stateBefore);
+assert.equal(langApp.el('word-help').open,true);assert.match(langApp.el('word-help-content').innerHTML,/Rubber is a material/);
+assert.doesNotMatch(langApp.el('word-help-content').innerHTML,/[\u4e00-\u9fff]/);
+assert.equal(langApp.el('random').textContent,'Random');assert.equal(langApp.el('catalog').textContent,'Choose words');
+assert.equal(langApp.el('category-compound').textContent,'One word');assert.equal(langApp.el('category-pair').textContent,'Two words');
+assert.equal(langApp.el('language-en').attributes['aria-current'],'page');
+assert.equal(langApp.el('search').attributes['aria-label'],'Search word groups in English or Chinese');
+assert.equal(langApp.location.search,'?lang=en');
+const langReload=boot({storage:languageStore,url:'https://example.test/',languages:['zh-CN']});
+assert.equal(langReload.run('locale'),'en');assert.equal(langReload.run('deck[position].id'),langApp.run('deck[position].id'));
+// Open chooser preserves query and English result words while switching.
+langApp.run('openLibrary()');langApp.el('search').value='rubber';langApp.el('search').oninput();
+langApp.run("setLanguage('zh')");assert.equal(langApp.el('overlay').hidden,false);assert.equal(langApp.el('search').value,'rubber');
+assert.match(langApp.el('library').innerHTML,/rubber duck/);assert.doesNotMatch(langApp.el('library').innerHTML,/橡胶小鸭/);
+langApp.run("setLanguage('en')");
+assert.doesNotMatch(langApp.el('library').innerHTML,/[\u4e00-\u9fff]/);
+langApp.run('closeLibrary()');
+// Every card, note, action, status and library result in English is free of Chinese UI copy.
+const english=boot({url:'https://example.test/?lang=en'});
+for(let i=0;i<117;i++){
+  english.run(`position=${i};revealed=false;render()`);
+  assert.doesNotMatch(english.el('cards').innerHTML,/[\u4e00-\u9fff]/);
+  assert.doesNotMatch(english.el('word-help-content').innerHTML,/[\u4e00-\u9fff]/);
+  english.run('primaryAction()');
+  assert.equal(english.run('revealed'),true);
+  assert.doesNotMatch(english.el('cards').innerHTML,/[\u4e00-\u9fff]/);
+}
+english.run('openLibrary()');assert.doesNotMatch(english.el('library').innerHTML,/[\u4e00-\u9fff]/);
+english.el('search').value='zzzz';english.el('search').oninput();assert.match(english.el('library').innerHTML,/No matches/);
+english.run("closeLibrary();say('snow')");assert.match(english.el('toast').textContent,/Speech is unavailable/);
+english.run('toggleReviewOnly()');assert.match(english.el('cards').innerHTML,/No groups to practice/);
+for(const id of ['help-listen','help-examples','help-notes','help-sort','help-progress','help-shortcuts','help-file','save-note','learning-status','reveal','review-only','auto-read','updated-label'])assert.doesNotMatch(english.el(id).textContent,/[\u4e00-\u9fff]/,id);
+// Speech language does not follow interface language; preserve the English voice.
+const voiceApp=boot({url:'https://example.test/?lang=en'});
+voiceApp.run("window.SpeechSynthesisUtterance=function(word){this.text=word};window.spoken=[];window.speechSynthesis={cancel(){},getVoices(){return[]},speak(u){window.spoken.push(u)}};say('snow');setLanguage('zh');say('snow')");
+assert.deepEqual(JSON.parse(voiceApp.run('JSON.stringify(window.spoken.map(u=>[u.text,u.lang]))')),[['snow','en-US'],['snow','en-US']]);
+for(const storage of [null,{getItem(){throw Error('Blocked')},setItem(){throw Error('Blocked')}}]){
+  const blocked=boot({storage,url:'https://example.test/',languages:['zh-CN']});
+  assert.doesNotThrow(()=>blocked.run("setLanguage('en');primaryAction()"));assert.equal(blocked.run('locale'),'en');
+}
+const beforeInvalid=langApp.run('locale');langApp.run("setLanguage('bad')");assert.equal(langApp.run('locale'),beforeInvalid);
+console.log('Bilingual UI passed: locale precedence, manual selection, URL sharing, reload, unchanged progress/card/reveal/search, all English text, English speech, and blocked storage.');
+
+const confirmCurrent=boot({url:'https://example.test/',languages:['en-US']});
+confirmCurrent.run("setLanguage('en')");
+assert.equal(confirmCurrent.storage.getItem(languageKey),'en');
+assert.equal(confirmCurrent.storage.getItem(storageKey),null);
+assert.equal(confirmCurrent.location.search,'?lang=en');

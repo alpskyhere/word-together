@@ -1,47 +1,48 @@
-# Word Together · 单词合体
+# Word Together
 
-给孩子和家长一起玩的英语图片卡片。家长不熟悉英文也能陪玩：点图片听发音，展开“中文提示”看意思。共 **117 组词语组合**，其中 79 组连着写、38 组分开写。
+**English** · [简体中文](README.zh-CN.md)
 
-- `snow（雪）+ man（人）→ snowman（雪人）`
-- `toy（玩具）+ car（汽车）→ toy car（玩具汽车）`
+A picture-card word game for children and families. Explore **117 word groups**: 79 written as one word and 38 written as two words.
 
-[打开在线版](https://alpskyhere.github.io/word-together/)。也可以下载仓库，用浏览器打开 `index.html`，无需安装。此版本不包含 PDF。
+`snow + man → snowman` · `toy + car → toy car`
 
-## 怎么玩
+[Play in English](https://alpskyhere.github.io/word-together/?lang=en) · [使用中文版](https://alpskyhere.github.io/word-together/?lang=zh)
 
-1. 点击图片、英文或“听”，听单词发音。
-2. 点击“拍手，揭晓”，看组合后的词。默认自动朗读，可关闭。
-3. 点击“下一组”继续；“拆开看看”返回当前组的两个词。
+## Language
 
-不懂词义时，展开卡片下方的“中文提示”，可查看两个词及组合词的中文意思；换到另一组后自动收起。提示默认收起，孩子仍先看英文和图片。
+Choose **中文 / English** at the top of the page. Buttons, instructions, word notes, status messages and accessibility labels use the selected language. The learning words, pictures and pronunciation stay the same; words and speech are always English.
 
-有些组合不能按字面理解，例如 `hot dog` 是热狗，`butterfly` 是蝴蝶。中文提示会为这类组合补一句解释。这是词语组合游戏，颜色表示词块，不是音节划分。
+Language-specific links take priority, followed by your saved language choice, then your browser language. Switching languages keeps the current card, reveal state, sorting and learning progress.
 
-用“选词”输入中文或英文，例如“雪人”或 `snowman`；用“随机一组”换词。想复习的词可加入“下次再练”，之后从“再练清单”集中练习。快捷键在页面的“玩法说明”里。
+## How to play
 
-## 分类与排序
+1. Click a picture, word or **Listen** to hear it.
+2. Choose **Clap & reveal** to see the combined word or phrase. Automatic reading can be turned off.
+3. Choose **Next group** to continue, or **Show the parts** to revisit the same group.
 
-分类可选“全部 / 连着写 / 分开写”。排序可选：
+Some combinations have a meaning of their own, such as `hot dog` and `butterfly`. Open **Word notes** for an explanation in the interface language. Notes start closed and close when you move to another group.
 
-- **推荐顺序**：先看直观组合，再看需要解释的词。
-- **字母 A–Z / Z–A**：按完整词语排序，忽略空格。
-- **短词在前**：按字母数排序，同样长度按 A–Z。
+Use **Choose words** to search in English or Chinese, **Random** to pick another group, and **Practice later** to save a group to your practice list. Colors show word parts, not syllables; this game is not a complete phonics course.
 
-排序也适用于选词列表和再练清单。切换排序从当前范围的第一组开始，已有学习记录保留。
+## Categories and sorting
 
-## 学习记录
+Choose **All / One word / Two words**. Sort by **Suggested order**, **Alphabetical A–Z / Z–A**, or **Shortest first**. Alphabetical order ignores spaces; shortest first counts letters, with A–Z for ties.
 
-位置、排序、已揭晓词组和再练清单只保存在当前浏览器，不上传。不同设备不会自动同步，清除浏览器数据会删除记录。“已揭晓”表示看过，不代表已经掌握。
+Changing the sort starts at the first group in the current selection and preserves learning records. The chooser and practice list follow the same sort.
 
-图片、词库和中文提示内嵌在网页中，可离线查看；朗读是否可用取决于浏览器和系统语音。词义按当前图片和组合解释，并不列出一个词的全部意思。
+## Progress and offline use
 
-## 测试
+Progress and your explicit language choice stay in the current browser and are not uploaded. Devices do not sync automatically. Clearing browser data removes saved records. “Revealed” means seen, not mastered.
 
-无需安装第三方包：
+You can also download the repository and open `index.html` in a browser, without installing anything. Words, pictures and both interface languages are embedded; speech availability depends on the browser and system voices. This release does not include PDFs.
+
+## Tests
+
+No third-party packages are required:
 
 ```sh
 python3 test_site.py
 node test_app.cjs
 ```
 
-网页更新时间（加州时间）：**10/25/2026 08:45 PDT (UTC-07:00)** · [版本信息](release.json)
+Updated (California time): **10/25/2026 09:07 PDT (UTC-07:00)** · [Release information](release.json)

@@ -33,7 +33,7 @@ class SiteTests(unittest.TestCase):
         self.assertEqual(visible.group(3),'-07:00' if visible.group(2)=='PDT' else '-08:00')
         displayed=datetime.strptime(visible.group(1)+visible.group(3),'%m/%d/%Y %H:%M%z')
         self.assertEqual(displayed,updated.replace(second=0,microsecond=0))
-        self.assertIn('更新于 <time',self.html)
+        self.assertIn('id="updated-label"',self.html)
 
     def test_vocabulary_and_categories(self):
         cards=self.data['cards']
@@ -58,15 +58,29 @@ class SiteTests(unittest.TestCase):
             for key in ('a','b','word'):
                 with self.subTest(word=card['word'],part=key):
                     self.assertRegex(card['zh'][key],r'[\u4e00-\u9fff]')
-        self.assertIn('<summary>中文提示</summary>',self.html)
+        self.assertIn('<summary id="word-help-summary">词语提示</summary>',self.html)
         self.assertIn('搜索中文或英文词组',self.html)
         meanings={card['word']:card['zh'] for card in self.data['cards']}
         self.assertEqual(meanings['hot dog']['word'],'热狗')
         self.assertIn('不是',meanings['hot dog']['note'])
-        readme=(ROOT/'README.md').read_text()
-        for text in ('中文提示','中文或英文','snowman（雪人）','butterfly','默认收起'):
+        readme=(ROOT/'README.zh-CN.md').read_text()
+        for text in ('词语提示','中文或英文','单词和朗读始终是英文','butterfly','默认收起'):
             self.assertIn(text,readme)
         self.assertNotIn('GitHub Pages 启用后可用',readme)
+
+    def test_both_interface_languages_are_complete(self):
+        ui=self.data['ui']
+        self.assertEqual(set(ui),{'zh','en'})
+        self.assertEqual(set(ui['zh']),set(ui['en']))
+        for key in ui['zh']:
+            self.assertTrue(ui['zh'][key].strip())
+            self.assertTrue(ui['en'][key].strip())
+            self.assertNotRegex(ui['en'][key],r'[\u4e00-\u9fff]')
+        for card in self.data['cards']:
+            self.assertEqual(bool(card['zh']['note']),bool(card['note_en']))
+            self.assertNotRegex(card['note_en'],r'[\u4e00-\u9fff]')
+        self.assertIn('href="?lang=zh" lang="zh-CN"',self.html)
+        self.assertIn('href="?lang=en" lang="en"',self.html)
 
     def test_images_differ_by_more_than_color(self):
         def shape(word):
@@ -86,7 +100,7 @@ class SiteTests(unittest.TestCase):
         self.assertNotIn('127.0.0.1',self.html)
 
     def test_readme_matches_this_release(self):
-        readme=(ROOT/'README.md').read_text()
+        readme=(ROOT/'README.zh-CN.md').read_text()
         release=json.loads((ROOT/'release.json').read_text())
         visible=re.search(r'<time id="updated-at"[^>]*>([^<]+)</time>',self.html).group(1)
         self.assertIn(f'网页更新时间（加州时间）：**{visible}**',readme)
@@ -98,9 +112,19 @@ class SiteTests(unittest.TestCase):
         self.assertNotIn('__UPDATED_AT__',readme)
         self.assertNotIn('__UPDATED_DISPLAY__',readme)
         self.assertNotIn('__SHA256__',readme)
+        english=(ROOT/'README.md').read_text()
+        self.assertIn(f'Updated (California time): **{visible}**',english)
+        self.assertIn(f"{len(self.data['cards'])} word groups",english)
+        self.assertIn(f"{len(self.data['cards'])-pairs} written as one word and {pairs} written as two words",english)
+        self.assertIn('[简体中文](README.zh-CN.md)',english)
+        self.assertIn('[English](README.md)',readme)
+        for doc in (english,readme):
+            for language in ('zh','en'):
+                self.assertIn(f'https://alpskyhere.github.io/word-together/?lang={language}',doc)
+            self.assertNotIn('__UPDATED_',doc)
 
     def test_package_has_no_pdf_or_extra_files(self):
-        expected={'.nojekyll','README.md','index.html','release.json','test_site.py','test_app.cjs'}
+        expected={'.nojekyll','README.md','README.zh-CN.md','index.html','release.json','test_site.py','test_app.cjs'}
         files={p.name for p in ROOT.iterdir() if p.name!='__pycache__'}
         self.assertEqual(files,expected)
         self.assertFalse(re.search(r'(?:href|src)\s*=\s*[\"\'][^\"\']*\.pdf(?:[?#\"\'])',self.html,re.I))
