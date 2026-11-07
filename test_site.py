@@ -134,7 +134,8 @@ class SiteTests(unittest.TestCase):
 
     def test_package_has_only_approved_files_and_matching_print_downloads(self):
         expected={'.nojekyll','README.md','README.zh-CN.md','index.html','release.json','test_site.py','test_app.cjs',
-                  'downloads/word-together-color.pdf','downloads/word-together-coloring.pdf'}
+                  'downloads/word-together-color.pdf','downloads/word-together-coloring.pdf',
+                  'assets/folding-guide-en.png','assets/folding-guide-zh.png'}
         files={p.relative_to(ROOT).as_posix() for p in ROOT.rglob('*') if p.is_file() and '__pycache__' not in p.parts}
         self.assertEqual(files,expected)
         release=json.loads((ROOT/'release.json').read_text())['downloads']
@@ -151,6 +152,16 @@ class SiteTests(unittest.TestCase):
                 text=(ROOT/readme).read_text();self.assertIn(f']({item["file"]})',text)
                 self.assertIn('282',text)
                 self.assertNotIn('does not include PDFs',text);self.assertNotIn('此版本不包含 PDF',text)
+
+    def test_bilingual_readmes_embed_local_folding_guides(self):
+        for language,name in (('en','README.md'),('zh','README.zh-CN.md')):
+            guide=f'assets/folding-guide-{language}.png'
+            self.assertRegex((ROOT/name).read_text(),r'!\[[^\]]+\]\('+re.escape(guide)+r'\)')
+            raw=(ROOT/guide).read_bytes()
+            self.assertEqual(raw[:8],b'\x89PNG\r\n\x1a\n')
+            self.assertEqual(raw[12:16],b'IHDR')
+            self.assertEqual(int.from_bytes(raw[16:20],'big'),1400)
+            self.assertEqual(int.from_bytes(raw[20:24],'big'),1840)
 
     def test_simplified_interface_structure(self):
         class Structure(HTMLParser):

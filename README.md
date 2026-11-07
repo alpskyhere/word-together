@@ -47,6 +47,8 @@ Both editions contain the same **141 groups** as the website, in suggested order
 
 Print **A4 landscape, actual size 100%, one page per side, duplex with short-edge flipping**. Test **pages 1–2** first. Each odd/even page pair makes one card; print complete pairs, such as pages 1–20 for the first ten cards. Do not use booklet mode.
 
+![Folding guide: place the result face up and fold each outer quarter inward at the edge marks. Close to read snow and man; open and tuck the doors behind the center to reveal snowman.](assets/folding-guide-en.png)
+
 Place the combined word face up. Fold the left and right quarters inward at the small edge marks, so both paper edges meet in the middle. Closed, the card shows the two parts. Open the doors and fold them behind the center to show only the combined word or phrase. For color words such as `blue` and `black`, name the color before coloring.
 
 ## Progress and offline use
