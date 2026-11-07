@@ -36,11 +36,24 @@ Changing the sort starts at the first group in the current selection and preserv
 
 Each click on **Shuffle** creates a different order from the previous one and starts at the first group. **All** includes all 141 groups; a category or review list shows only its matching groups. **Next group** follows the new order without repeats in a complete pass. Reloading preserves the order and position. When updating from the 117-group edition, existing learning records and the saved shuffled order are kept, with new groups appended. With fewer than two groups, shuffling is unavailable.
 
+## Printable fold cards
+
+Choose **PDFs** at the top right of the website, or download an edition here:
+
+- [Color PDF](downloads/word-together-color.pdf)
+- [Coloring PDF](downloads/word-together-coloring.pdf) — black outlines with white interiors for children to color.
+
+Both editions contain the same **141 groups** as the website, in suggested order: **282 PDF pages = 141 double-sided sheets**. All learning words stay in English. Each picture and word appears once, with large lettering and extra letter spacing. No cutting or glue is needed.
+
+Print **A4 landscape, actual size 100%, one page per side, duplex with short-edge flipping**. Test **pages 1–2** first. Each odd/even page pair makes one card; print complete pairs, such as pages 1–20 for the first ten cards. Do not use booklet mode.
+
+Place the combined word face up. Fold the left and right quarters inward at the small edge marks, so both paper edges meet in the middle. Closed, the card shows the two parts. Open the doors and fold them behind the center to show only the combined word or phrase. For color words such as `blue` and `black`, name the color before coloring.
+
 ## Progress and offline use
 
 Progress and your explicit language choice stay in the current browser and are not uploaded. Devices do not sync automatically. Clearing browser data removes saved records. The main page shows the current group number; the total “Revealed” count is inside **Choose words**. “Revealed” means seen, not mastered.
 
-You can also download the repository and open `index.html` in a browser, without installing anything. Words, pictures and both interface languages are embedded; speech availability depends on the browser and system voices. This release does not include PDFs.
+You can also download the repository and open `index.html` in a browser, without installing anything. Words, pictures and both interface languages are embedded; speech availability depends on the browser and system voices. The repository's `downloads` folder contains the PDFs for offline printing. The website's download buttons link to the online copies.
 
 ## Feedback
 
@@ -57,4 +70,4 @@ python3 test_site.py
 node test_app.cjs
 ```
 
-Updated (California time): **10/25/2026 15:22 PDT (UTC-07:00)** · [Release information](release.json)
+Updated (California time): **11/06/2026 21:09 PST (UTC-08:00)** · [Release information](release.json)

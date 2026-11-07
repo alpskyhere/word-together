@@ -132,11 +132,25 @@ class SiteTests(unittest.TestCase):
                 self.assertIn(f'https://alpskyhere.github.io/word-together/?lang={language}',doc)
             self.assertNotIn('__UPDATED_',doc)
 
-    def test_package_has_no_pdf_or_extra_files(self):
-        expected={'.nojekyll','README.md','README.zh-CN.md','index.html','release.json','test_site.py','test_app.cjs'}
-        files={p.name for p in ROOT.iterdir() if p.name!='__pycache__'}
+    def test_package_has_only_approved_files_and_matching_print_downloads(self):
+        expected={'.nojekyll','README.md','README.zh-CN.md','index.html','release.json','test_site.py','test_app.cjs',
+                  'downloads/word-together-color.pdf','downloads/word-together-coloring.pdf'}
+        files={p.relative_to(ROOT).as_posix() for p in ROOT.rglob('*') if p.is_file() and '__pycache__' not in p.parts}
         self.assertEqual(files,expected)
-        self.assertFalse(re.search(r'(?:href|src)\s*=\s*[\"\'][^\"\']*\.pdf(?:[?#\"\'])',self.html,re.I))
+        release=json.loads((ROOT/'release.json').read_text())['downloads']
+        self.assertEqual(release['groups'],len(self.data['cards']))
+        self.assertEqual(release['pages_per_pdf'],len(self.data['cards'])*2)
+        for edition in ('color','coloring'):
+            item=release['files'][edition];raw=(ROOT/item['file']).read_bytes()
+            self.assertEqual(item['file'],f'downloads/word-together-{edition}.pdf')
+            self.assertTrue(raw.startswith(b'%PDF-'))
+            self.assertEqual(hashlib.sha256(raw).hexdigest(),item['sha256'])
+            self.assertEqual(len(raw),item['bytes'])
+            self.assertIn(f'href="https://alpskyhere.github.io/word-together/{item["file"]}" download=',self.html)
+            for readme in ('README.md','README.zh-CN.md'):
+                text=(ROOT/readme).read_text();self.assertIn(f']({item["file"]})',text)
+                self.assertIn('282',text)
+                self.assertNotIn('does not include PDFs',text);self.assertNotIn('此版本不包含 PDF',text)
 
     def test_simplified_interface_structure(self):
         class Structure(HTMLParser):
@@ -159,11 +173,12 @@ class SiteTests(unittest.TestCase):
             'library-panel':('filters','sort-order','review-only','learning-status','search','library'),
             'settings-panel':('auto-read','celebrate','celebration-sound','fullscreen','preview-celebration'),
             'feedback-panel':('feedback-link','feedback-browse','feedback-notice'),
+            'downloads-panel':('download-color','download-coloring','download-intro','download-print','download-fold-one','download-fold-two'),
         }.items():
             for control in controls:
                 self.assertIn(panel,structure.parents[control],control)
                 self.assertNotIn('main-ui',structure.parents[control],control)
-        for control in ('catalog','settings','feedback','reveal','next'):
+        for control in ('catalog','settings','feedback','downloads','reveal','next'):
             self.assertIn('main-ui',structure.parents[control])
         self.assertNotIn('role="progressbar"',self.html)
         self.assertNotIn('progress',structure.parents)

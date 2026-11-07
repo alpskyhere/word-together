@@ -7,7 +7,7 @@ function memoryStorage(initial={}){
 }
 function boot({storage=memoryStorage(),data=payload,url='https://example.test/?lang=zh',languages=['zh-CN'],reducedMotion=false,audioContext}={}){
   const elements=new Map();
-  function el(id){if(!elements.has(id))elements.set(id,{id,style:{},dataset:{},attributes:{},textContent:'',innerHTML:'',value:'',hidden:['overlay','celebration','settings-panel','feedback-panel'].includes(id),setAttribute(k,v){this.attributes[k]=String(v)},getAttribute(k){return this.attributes[k]??null},focus(){context.document.activeElement=this;},getClientRects(){return this.hidden?[]:[{}]},querySelectorAll(){return[]}});return elements.get(id)}
+  function el(id){if(!elements.has(id))elements.set(id,{id,style:{},dataset:{},attributes:{},textContent:'',innerHTML:'',value:'',hidden:['overlay','celebration','settings-panel','feedback-panel','downloads-panel'].includes(id),setAttribute(k,v){this.attributes[k]=String(v)},getAttribute(k){return this.attributes[k]??null},focus(){context.document.activeElement=this;},getClientRects(){return this.hidden?[]:[{}]},querySelectorAll(){return[]}});return elements.get(id)}
   el('word-data').textContent=data;
   el('updated-at').setAttribute('datetime',html.match(/<time id="updated-at" datetime="([^"]+)"/)[1]);
   const filters=filterKeys.map(k=>{let e=el('filter-'+k);e.dataset.filter=k;return e});
@@ -194,11 +194,11 @@ const storageKey='word-together:learning:v1';
 const panels=boot();
 const panelState=()=>panels.run('JSON.stringify({position,revealed,completed:[...completed],review:[...review],batch:[...celebrationBatch]})');
 const originalPanelState=panelState();
-for(const [panel,opener,title] of [['library','catalog','选一组词'],['settings','settings','设置'],['feedback','feedback','反馈']]){
+for(const [panel,opener,title] of [['library','catalog','选一组词'],['settings','settings','设置'],['feedback','feedback','反馈'],['downloads','downloads','打印折叠卡']]){
   panels.el(opener).onclick();
   assert.equal(panels.el('overlay').hidden,false);assert.equal(panels.el('main-ui').inert,true);
   assert.equal(panels.el('library-title').textContent,title);
-  for(const candidate of ['library','settings','feedback'])assert.equal(panels.el(candidate+'-panel').hidden,candidate!==panel);
+  for(const candidate of ['library','settings','feedback','downloads'])assert.equal(panels.el(candidate+'-panel').hidden,candidate!==panel);
   assert.equal(panels.el(opener).getAttribute('aria-expanded'),'true');
   assert.equal(panels.context.document.activeElement,panels.el(panel==='library'?'search':'close'));
   panels.handlers.keydown(space);panels.handlers.keydown({...space,key:'ArrowRight',code:'ArrowRight'});
@@ -212,7 +212,7 @@ panels.el('feedback').onclick();
 panels.el('overlay').onclick({target:panels.el('feedback-panel')});assert.equal(panels.el('overlay').hidden,false);
 panels.el('overlay').onclick({target:panels.el('overlay')});assert.equal(panels.context.document.activeElement,panels.el('feedback'));
 assert.equal(panels.storage.writes.length,0);
-for(const [panel,last] of [['library','sort-order'],['feedback','feedback-browse']]){
+for(const [panel,last] of [['library','sort-order'],['feedback','feedback-browse'],['downloads','download-coloring']]){
   panels.run(`openPanel('${panel}')`);
   const invisible=panels.el('invisible-descendant');invisible.getClientRects=()=>[];
   const disabled=panels.el('disabled-control');disabled.disabled=true;
@@ -223,11 +223,19 @@ for(const [panel,last] of [['library','sort-order'],['feedback','feedback-browse
   panels.run('closeLibrary()');
 }
 const englishPanels=boot({url:'https://example.test/?lang=en'});
-for(const [panel,title] of [['library','Choose a word group'],['settings','Settings'],['feedback','Feedback']]){
+for(const [panel,title] of [['library','Choose a word group'],['settings','Settings'],['feedback','Feedback'],['downloads','Printable fold cards']]){
   englishPanels.run(`openPanel('${panel}')`);assert.equal(englishPanels.el('library-title').textContent,title);
 }
 assert.equal(englishPanels.el('review-only').textContent,'Review list 0');
 assert.equal(englishPanels.el('next').textContent,'Skip');
+assert.equal(englishPanels.el('downloads').textContent,'PDFs');
+assert.equal(englishPanels.el('download-color').textContent,'Color PDF');
+assert.equal(englishPanels.el('download-coloring').textContent,'Coloring PDF');
+assert.match(englishPanels.el('download-print').textContent,/flip on short edge/);
+assert.match(englishPanels.el('download-intro').textContent,/282 pages/);
+englishPanels.run("setLanguage('zh')");
+assert.equal(englishPanels.el('library-title').textContent,'打印折叠卡');
+assert.equal(englishPanels.el('download-coloring').textContent,'涂色版 PDF');
 
 // A single prominent forward action; skipping is only available before reveal.
 const forward=boot();
