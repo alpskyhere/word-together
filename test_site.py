@@ -73,7 +73,7 @@ class SiteTests(unittest.TestCase):
         self.assertEqual(meanings['hot dog']['word'],'热狗')
         self.assertIn('不是',meanings['hot dog']['note'])
         readme=(ROOT/'README.zh-CN.md').read_text()
-        for text in ('词语提示','中文或英文','单词和朗读始终是英文','butterfly','默认收起'):
+        for text in ('词语提示','中文或英文','单词和朗读始终是英文','butterfly'):
             self.assertIn(text,readme)
         self.assertNotIn('GitHub Pages 启用后可用',readme)
 
@@ -122,7 +122,7 @@ class SiteTests(unittest.TestCase):
         self.assertNotIn('__UPDATED_DISPLAY__',readme)
         self.assertNotIn('__SHA256__',readme)
         english=(ROOT/'README.md').read_text()
-        self.assertIn(f'Updated (California time): **{visible}**',english)
+        self.assertIn(f'Website updated (California time): **{visible}**',english)
         self.assertIn(f"{len(self.data['cards'])} word groups",english)
         self.assertIn(f"{len(self.data['cards'])-pairs} written as one word and {pairs} written as two words",english)
         self.assertIn('[简体中文](README.zh-CN.md)',english)
@@ -154,14 +154,51 @@ class SiteTests(unittest.TestCase):
                 self.assertNotIn('does not include PDFs',text);self.assertNotIn('此版本不包含 PDF',text)
 
     def test_bilingual_readmes_embed_local_folding_guides(self):
+        class Images(HTMLParser):
+            def __init__(self):
+                super().__init__();self.images=[]
+            def handle_starttag(self,tag,attrs):
+                if tag=='img':self.images.append(dict(attrs))
         for language,name in (('en','README.md'),('zh','README.zh-CN.md')):
             guide=f'assets/folding-guide-{language}.png'
-            self.assertRegex((ROOT/name).read_text(),r'!\[[^\]]+\]\('+re.escape(guide)+r'\)')
+            parser=Images();parser.feed((ROOT/name).read_text())
+            self.assertEqual(len(parser.images),1)
+            image=parser.images[0]
+            self.assertEqual(image['src'],guide)
+            self.assertTrue(image.get('alt','').strip())
+            self.assertLessEqual(int(image['width']),640)
             raw=(ROOT/guide).read_bytes()
             self.assertEqual(raw[:8],b'\x89PNG\r\n\x1a\n')
             self.assertEqual(raw[12:16],b'IHDR')
             self.assertEqual(int.from_bytes(raw[16:20],'big'),1400)
             self.assertEqual(int.from_bytes(raw[20:24],'big'),1840)
+
+    def test_readme_local_links_exist_and_disclosures_are_balanced(self):
+        class Markup(HTMLParser):
+            def __init__(self):
+                super().__init__();self.stack=[];self.summaries=[];self.targets=[]
+            def handle_starttag(self,tag,attrs):
+                attrs=dict(attrs)
+                if tag=='details':
+                    self.stack.append(tag);self.summaries.append(0)
+                if tag=='summary':
+                    if not self.stack:raise AssertionError('Summary outside disclosure')
+                    self.summaries[-1]+=1
+                for key in ('href','src'):
+                    if key in attrs:self.targets.append(attrs[key])
+            def handle_endtag(self,tag):
+                if tag=='details':
+                    if not self.stack:raise AssertionError('Unmatched disclosure')
+                    self.stack.pop()
+        for name in ('README.md','README.zh-CN.md'):
+            source=(ROOT/name).read_text();parser=Markup();parser.feed(source)
+            self.assertEqual(parser.stack,[])
+            self.assertTrue(parser.summaries)
+            self.assertTrue(all(count==1 for count in parser.summaries))
+            targets=parser.targets+re.findall(r'\]\(([^)]+)\)',source)
+            for target in targets:
+                if not target.startswith(('https://','#')):
+                    self.assertTrue((ROOT/target).is_file(),f'{name}: missing {target}')
 
     def test_simplified_interface_structure(self):
         class Structure(HTMLParser):
@@ -228,7 +265,7 @@ class SiteTests(unittest.TestCase):
         self.assertIn('<option id="sort-shuffle" value="shuffle">随机顺序</option>',self.html)
         self.assertEqual(self.data['ui']['en']['random'],'Shuffle')
         self.assertEqual(self.data['ui']['en']['shuffle'],'Shuffled order')
-        for filename,terms in [('README.md',('different order from the previous one','141 groups','Reloading preserves the order and position')),('README.zh-CN.md',('与上一次不同的顺序','141 组','刷新后保留顺序和位置'))]:
+        for filename,terms in [('README.md',('different order','141 groups','no repeats')),('README.zh-CN.md',('不同顺序','141 组','一轮内不重复'))]:
             doc=(ROOT/filename).read_text()
             for text in terms:self.assertIn(text,doc)
         for filename in ('README.md','README.zh-CN.md'):
@@ -246,7 +283,7 @@ class SiteTests(unittest.TestCase):
         self.assertIn('@media(prefers-reduced-motion:reduce){.confetti{display:none}}',self.html)
         self.assertEqual(self.data['ui']['en']['celebrationOff'],'Celebrate: off')
         self.assertEqual(self.data['ui']['zh']['celebrationOff'],'庆祝：关')
-        for filename,terms in [('README.md',('on by default','10 different groups','3.6 seconds','⌘-click','Ctrl-click')),('README.zh-CN.md',('默认开启','10 个不同词组','3.6 秒','按住 ⌘','按住 Ctrl'))]:
+        for filename,terms in [('README.md',('on by default','10 different groups','⌘-click','Ctrl-click')),('README.zh-CN.md',('默认开启','10 个不同词组','按住 ⌘','按住 Ctrl'))]:
             doc=(ROOT/filename).read_text()
             for term in terms:self.assertIn(term,doc)
             for lang in ('zh','en'):
